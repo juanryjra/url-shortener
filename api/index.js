@@ -9,11 +9,12 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "false");
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { action, slug, url, password } = req.method === "POST"
-    ? req.body : req.query;
+  const auth = req.headers.authorization;
+  const { action, slug, url } = req.method === "POST" ? req.body : req.query;
 
   if (req.method === "GET" && !action) {
     if (!slug) return res.status(400).json({ error: "Slug requerido" });
@@ -22,7 +23,13 @@ export default async function handler(req, res) {
     return res.redirect(301, target);
   }
 
-  const auth = req.headers.authorization;
+  if (req.method === "GET" && action === "redirect") {
+    if (!slug) return res.status(400).json({ error: "Slug requerido" });
+    const target = await redis.get(`url:${slug}`);
+    if (!target) return res.status(404).json({ error: "Enlace no encontrado" });
+    return res.redirect(301, target);
+  }
+
   if (!auth || auth !== `Bearer ${process.env.APP_PASSWORD}`) {
     return res.status(401).json({ error: "No autorizado" });
   }
