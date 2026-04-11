@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>juteach.org — Acortador de enlaces</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;padding:2rem 1rem}
+  .wrap{max-width:700px;margin:0 auto}
+  .header{background:#1D9E75;border-radius:16px;padding:1.1rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:14px}
+  .header-icon{width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .header h1{font-size:17px;font-weight:500;color:#fff}
+  .header p{font-size:11px;color:rgba(255,255,255,.75);margin-top:1px}
+  .tabs{display:flex;gap:4px;margin-bottom:1.25rem;background:#e8e8e8;border-radius:12px;padding:4px}
+  .tab{flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:#666;transition:all .15s}
+  .tab.active{background:#fff;color:#085041;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .section{display:none}
+  .section.active{display:block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:#fff;border:0.5px solid #e0e0e0;border-radius:16px;padding:1.25rem 1.5rem}
+  .stitle{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+  label{font-size:12px;color:#666;display:block;margin-bottom:5px}
+  input[type=text],input[type=number],select{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:12px;outline:none}
+  input:focus{border-color:#1D9E75}
+  .alias-wrap{display:flex;border:1.5px solid #5DCAA5;border-radius:10px;overflow:hidden;margin-bottom:4px}
+  .alias-pre{padding:9px 10px;font-size:12px;color:#0F6E56;background:#E1F5EE;white-space:nowrap;border-right:1px solid #9FE1CB}
+  .alias-wrap input{border:none;border-radius:0;outline:none;padding-left:8px;margin:0;flex:1}
+  .hint{font-size:11px;color:#aaa;margin-bottom:12px}
+  .btn{border:none;border-radius:10px;font-weight:500;cursor:pointer;font-size:14px;padding:11px 20px;transition:all .15s;width:100%}
+  .btn-primary{background:#1D9E75;color:#fff}
+  .btn-primary:hover{background:#0F6E56}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:#E1F5EE;color:#085041;border:1px solid #9FE1CB;font-size:12px;padding:6px 12px;width:auto}
+  .btn-danger{background:transparent;color:#A32D2D;border:1px solid #F09595;font-size:12px;padding:6px 12px;width:auto}
+  .error{background:#FCEBEB;border:1px solid #F09595;border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#791F1F;display:none}
+  .success-box{background:#E1F5EE;border:1px solid #5DCAA5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:none}
+  .success-box .label{font-size:11px;color:#0F6E56;font-weight:500;margin-bottom:4px}
+  .success-box .link{font-size:13px;font-weight:500;color:#085041;margin-bottom:8px;word-break:break-all}
+  .success-box .actions{display:flex;gap:6px}
+  .link-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  .link-num{width:32px;height:32px;border-radius:9px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#085041;flex-shrink:0}
+  .link-info{flex:1;min-width:0}
+  .link-short{font-size:14px;font-weight:500;color:#0F6E56;margin-bottom:2px}
+  .link-url{font-size:12px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .link-actions{display:flex;gap:6px;flex-shrink:0}
+  .qr-colors{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .color-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+  .color-dot.active{border-color:#1D9E75;box-shadow:0 0 0 1px #1D9E75}
+  .qr-styles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .style-btn{padding:6px 8px;border-radius:9px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:12px;cursor:pointer;transition:all .15s}
+  .style-btn.active{border-color:#1D9E75;background:#E1F5EE;color:#085041;font-weight:500}
+  .upload-zone{border:1.5px dashed #5DCAA5;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#E1F5EE;margin-bottom:12px;font-size:12px;color:#0F6E56}
+  .qr-preview{text-align:center;margin-top:12px}
+  .qr-preview canvas{border:2px solid #9FE1CB;border-radius:12px;padding:6px}
+  .empty{text-align:center;padding:2.5rem;background:#fff;border-radius:16px;border:0.5px solid #e0e0e0}
+  .empty-icon{width:44px;height:44px;border-radius:50%;background:#E1F5EE;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="header-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </div>
+    <div>
+      <h1>juteach.org</h1>
+      <p>Profesor · Coach · Tecnología</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('inicio')">Inicio</button>
+    <button class="tab" onclick="showTab('enlaces')">Mis enlaces</button>
+  </div>
+
+  <div id="tab-inicio" class="section active">
+    <div class="grid">
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="stitle">Crear enlace corto</div>
+          <label>URL original</label>
+          <input type="text" id="url-input" placeholder="https://ejemplo.com/..."/>
+          <label>Alias personalizado</label>
+          <div class="alias-wrap">
+            <span class="alias-pre">juteach.org/</span>
+            <input type="text" id="slug-input" placeholder="mi-recurso"/>
+          </div>
+          <div class="hint">Solo letras, números y guiones.</div>
+          <div class="error" id="error-msg"></div>
+          <div class="success-box" id="success-box">
+            <div class="label">Enlace creado</div>
+            <div class="link" id="success-link"></div>
+            <div class="actions">
+              <button class="btn btn-ghost" onclick="copyLink()">Copiar</button>
+              <button class="btn btn-ghost" onclick="sendToQR()">Ver QR</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="create-btn" onclick="createLink()">+ Crear enlace</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="stitle">Código QR</div>
+        <label>Enlace para el QR</label>
+        <input type="text" id="qr-url" placeholder="https://juteach.org/..."/>
+        <label>Estilo</label>
+        <div class="qr-styles">
+          <button class="style-btn active" onclick="setStyle('square',this)">Clásico</button>
+          <button class="style-btn" onclick="setStyle('round',this)">Redondeado</button>
+          <button class="style-btn" onclick="setStyle('dot',this)">Puntos</button>
+          <button class="style-btn" onclick="setStyle('diamond',this)">Diamante</button>
+        </div>
+        <label>Color del QR</label>
+        <div class="qr-colors" id="qr-colors"></div>
+        <label>Color de fondo</label>
+        <div class="qr-colors" id="qr-bgs"></div>
+        <div class="upload-zone" onclick="document.getElementById('qr-img').click()">
+          <span id="img-label">Subir logo central (opcional)</span>
+        </div>
+        <input type="file" id="qr-img" accept="image/*" style="display:none" onchange="loadImg(this)"/>
+        <button class="btn btn-primary" onclick="generateQR()">Generar QR</button>
+        <div class="qr-preview" id="qr-preview" style="display:none">
+          <canvas id="qr-canvas" style="margin-bottom:10px"></canvas><br/>
+          <button class="btn btn-ghost" onclick="downloadQR()">Descargar PNG alta calidad</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-enlaces" class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:13px;color:#666" id="links-count">Cargando...</span>
+      <button class="btn btn-ghost" onclick="loadLinks()">Actualizar</button>
+    </div>
+    <div id="links-list"></div>
+  </div>
+</div>
+
+<script>
+const PWD = "-Acortador2026";
+const H = {"Content-Type":"application/json","Authorization":"Bearer "+PWD};
+let qrStyle="square", qrColor="#1D9E75", qrBg="#ffffff", qrImgData=null, allLinks=[];
+
+const QR_COLORS=["#1D9E75","#085041","#378ADD","#185FA5","#7F77DD","#534AB7","#E24B4A","#000000"];
+const QR_BGS=["#ffffff","#F1EFE8","#FAEEDA","#E6F1FB","#E1F5EE","#EEEDFE","#FCEBEB"];
+
+function initColors(){
+  const cc=document.getElementById("qr-colors");
+  QR_COLORS.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="color-dot"+(i===0?" active":"");
+    d.style.background=c;
+    d.onclick=()=>{ document.querySelectorAll("#qr-colors .color-dot").forEach(x=>x.classList.remove("active")); d.classList.add("active"); qrColor=c; };
+    cc.appendChild(d);
+  });
+  const cl=document.createElement("label");
+  cl.innerHTML='<span style="font-size:13px">+</span><input type="color" style="display:none" onchange="qrColor=this.value"/>';
+  cl.style.cssText="width:22px;height:22px;border-radius:50%;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer";
+  cc.appendChild(cl);
+
+  const bc=document.getElementById("qr-bgs");
+  QR_BGS.forEach((c,i)=>{
+    const d=document.createElement("div");
+    d.className="color-dot"+(i===0?" active":"");
+    d.style.cssText="background:"+c+";border-color:#ddd";
+    d.onclick=()=>{ document.querySelectorAll("#qr-bgs .color-dot").forEach(x=>x.classList.remove("active")); d.classList.add("active"); qrBg=c; };
+    bc.appendChild(d);
+  });
+  const bl=document.createElement("label");
+  bl.innerHTML='<span style="font-size:13px">+</span><input type="color" style="display:none" onchange="qrBg=this.value"/>';
+  bl.style.cssText="width:22px;height:22px;border-radius:50%;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer";
+  bc.appendChild(bl);
+}
+
+function setStyle(s,btn){ qrStyle=s; document.querySelectorAll(".style-btn").forEach(b=>b.classList.remove("active")); btn.classList.add("active"); }
+
+function showTab(t){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+  document.querySelector(`[onclick="showTab('${t}')"]`).classList.add("active");
+  document.getElementById("tab-"+t).classList.add("active");
+  if(t==="enlaces") loadLinks();
+}
+
+async function loadLinks(){
+  try{
+    const r=await fetch("/api/index.js?action=list",{headers:H});
+    const d=await r.json();
+    allLinks=Array.isArray(d)?d:[];
+    renderLinks();
+    updateQRSelect();
+  }catch(e){ document.getElementById("links-count").textContent="Error al cargar"; }
+}
+
+function updateQRSelect(){
+  const sel=document.getElementById("qr-url");
+  if(allLinks.length>0 && !sel.nextSibling?.tagName==="SELECT"){
+    const s=document.createElement("select");
+    s.style.cssText="width:100%;padding:7px 10px;border-radius:10px;border:1px solid #ddd;font-size:12px;margin-bottom:12px";
+    s.innerHTML='<option value="">Seleccionar enlace guardado...</option>'+allLinks.map(l=>`<option value="https://juteach.org/${l.slug}">/  ${l.slug}</option>`).join("");
+    s.onchange=()=>{ if(s.value) sel.value=s.value; };
+    sel.after(s);
+  }
+}
+
+function renderLinks(){
+  const c=document.getElementById("links-count");
+  const l=document.getElementById("links-list");
+  c.textContent=allLinks.length+" enlace"+(allLinks.length!==1?"s":"")+" activo"+(allLinks.length!==1?"s":"");
+  if(allLinks.length===0){
+    l.innerHTML='<div class="empty"><div class="empty-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#1D9E75" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#1D9E75" stroke-width="2" stroke-linecap="round"/></svg></div><p style="font-size:14px;font-weight:500;color:#666">No hay enlaces aún</p><p style="font-size:12px;color:#aaa;margin-top:4px;margin-bottom:14px">Cree su primer enlace personalizado</p><button class="btn btn-ghost" onclick="showTab(\'inicio\')" style="width:auto;margin:0 auto;display:block">Crear enlace</button></div>';
+    return;
+  }
+  l.innerHTML=allLinks.map((lk,i)=>`
+    <div class="link-card">
+      <div class="link-num">${i+1}</div>
+      <div class="link-info">
+        <div class="link-short">juteach.org/${lk.slug}</div>
+        <div class="link-url">${lk.url}</div>
+      </div>
+      <div class="link-actions">
+        <button class="btn btn-ghost" onclick="navigator.clipboard.writeText('https://juteach.org/${lk.slug}');this.textContent='Copiado';setTimeout(()=>this.textContent='Copiar',2000)">Copiar</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('qr-url').value='https://juteach.org/${lk.slug}';showTab('inicio')">QR</button>
+        <button class="btn btn-danger" onclick="deleteLink('${lk.slug}')">Eliminar</button>
+      </div>
+    </div>`).join("");
+}
+
+async function createLink(){
+  const url=document.getElementById("url-input").value.trim();
+  const slug=document.getElementById("slug-input").value.trim().replace(/[^a-zA-Z0-9-_]/g,"");
+  const err=document.getElementById("error-msg");
+  const sbox=document.getElementById("success-box");
+  err.style.display="none"; sbox.style.display="none";
+  if(!url) return showError("Ingrese la URL que desea acortar.");
+  if(!slug) return showError("Ingrese un alias personalizado.");
+  if(!/^https?:\/\//i.test(url)) return showError("La URL debe comenzar con https://");
+  if(allLinks.some(l=>l.slug===slug)) return showError(`El alias "${slug}" ya existe. Elija otro nombre.`);
+  const btn=document.getElementById("create-btn");
+  btn.disabled=true; btn.textContent="Creando...";
+  try{
+    const r=await fetch("/api/index.js",{method:"POST",headers:H,body:JSON.stringify({action:"create",url,slug})});
+    const d=await r.json();
+    if(d.error){ showError(d.error==="Ese alias ya existe"?`El alias "${slug}" ya está en uso.`:d.error); }
+    else{
+      document.getElementById("success-link").textContent=d.short;
+      sbox.style.display="block";
+      document.getElementById("url-input").value="";
+      document.getElementById("slug-input").value="";
+      loadLinks();
+    }
+  }catch{ showError("Error al conectar. Intente de nuevo."); }
+  btn.disabled=false; btn.textContent="+ Crear enlace";
+}
+
+function showError(msg){ const e=document.getElementById("error-msg"); e.textContent=msg; e.style.display="block"; }
+function copyLink(){ navigator.clipboard.writeText(document.getElementById("success-link").textContent); }
+function sendToQR(){ document.getElementById("qr-url").value=document.getElementById("success-link").textContent; }
+
+async function deleteLink(s){
+  await fetch("/api/index.js",{method:"POST",headers:H,body:JSON.stringify({action:"delete",slug:s})});
+  loadLinks();
+}
+
+function loadImg(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=e=>{ qrImgData=e.target.result; document.getElementById("img-label").textContent="Imagen cargada — clic para cambiar"; }; r.readAsDataURL(f);
+}
+
+function generateQR(){
+  const target=document.getElementById("qr-url").value.trim();
+  if(!target) return alert("Ingrese una URL para el QR");
+  const SCALE=4, size=300, pad=20, total=size+pad*2;
+  const canvas=document.getElementById("qr-canvas");
+  canvas.width=total*SCALE; canvas.height=total*SCALE;
+  const ctx=canvas.getContext("2d");
+  ctx.scale(SCALE,SCALE);
+  ctx.fillStyle=qrBg; ctx.fillRect(0,0,total,total);
+  ctx.fillStyle=qrColor;
+  const cols=29,rows=29,cell=size/cols,ox=pad,oy=pad;
+  const seed=target.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  const rng=(x,y)=>((x*31+y*17+seed*7)%13)>5;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    if(!rng(c,r)) continue;
+    const x=ox+c*cell,y=oy+r*cell,s=cell-.8;
+    ctx.beginPath();
+    if(qrStyle==="dot"){ ctx.arc(x+s/2,y+s/2,s/2*.85,0,Math.PI*2); }
+    else if(qrStyle==="round"){ const r2=s*.35; ctx.moveTo(x+r2,y); ctx.arcTo(x+s,y,x+s,y+s,r2); ctx.arcTo(x+s,y+s,x,y+s,r2); ctx.arcTo(x,y+s,x,y,r2); ctx.arcTo(x,y,x+s,y,r2); ctx.closePath(); }
+    else if(qrStyle==="diamond"){ ctx.moveTo(x+s/2,y); ctx.lineTo(x+s,y+s/2); ctx.lineTo(x+s/2,y+s); ctx.lineTo(x,y+s/2); ctx.closePath(); }
+    else{ ctx.rect(x,y,s,s); }
+    ctx.fill();
+  }
+  [[0,0],[cols-7,0],[0,rows-7]].forEach(([cx,cy])=>{
+    const x=ox+cx*cell,y=oy+cy*cell,sz=7*cell;
+    ctx.fillStyle=qrColor;
+    if(qrStyle==="round"||qrStyle==="dot"){
+      const r3=sz*.18; ctx.beginPath(); ctx.moveTo(x+r3,y); ctx.arcTo(x+sz,y,x+sz,y+sz,r3); ctx.arcTo(x+sz,y+sz,x,y+sz,r3); ctx.arcTo(x,y+sz,x,y,r3); ctx.arcTo(x,y,x+sz,y,r3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=qrBg; const r4=(sz-cell*2)*.18,ix=x+cell,iy=y+cell,isz=sz-cell*2; ctx.beginPath(); ctx.moveTo(ix+r4,iy); ctx.arcTo(ix+isz,iy,ix+isz,iy+isz,r4); ctx.arcTo(ix+isz,iy+isz,ix,iy+isz,r4); ctx.arcTo(ix,iy+isz,ix,iy,r4); ctx.arcTo(ix,iy,ix+isz,iy,r4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=qrColor; const r5=(sz-cell*4)*.18,jx=x+cell*2,jy=y+cell*2,jsz=sz-cell*4; ctx.beginPath(); ctx.moveTo(jx+r5,jy); ctx.arcTo(jx+jsz,jy,jx+jsz,jy+jsz,r5); ctx.arcTo(jx+jsz,jy+jsz,jx,jy+jsz,r5); ctx.arcTo(jx,jy+jsz,jx,jy,r5); ctx.arcTo(jx,jy,jx+jsz,jy,r5); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillRect(x,y,sz,sz); ctx.fillStyle=qrBg; ctx.fillRect(x+cell,y+cell,sz-cell*2,sz-cell*2); ctx.fillStyle=qrColor; ctx.fillRect(x+cell*2,y+cell*2,sz-cell*4,sz-cell*4);
+    }
+  });
+  const preview=document.getElementById("qr-preview");
+  if(qrImgData){
+    const img=new Image(); img.onload=()=>{ const iS=size*.22,ix=(total-iS)/2,iy=(total-iS)/2; ctx.fillStyle=qrBg; ctx.fillRect(ix-5,iy-5,iS+10,iS+10); ctx.drawImage(img,ix,iy,iS,iS); preview.style.display="block"; canvas.style.width="180px"; canvas.style.height="180px"; }; img.src=qrImgData;
+  } else { preview.style.display="block"; canvas.style.width="180px"; canvas.style.height="180px"; }
+}
+
+function downloadQR(){ const a=document.createElement("a"); a.download="qr-juteach.png"; a.href=document.getElementById("qr-canvas").toDataURL("image/png",1.0); a.click(); }
+
+initColors();
+loadLinks();
+</script>
+</body>
+</html>
