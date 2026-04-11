@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
@@ -9,10 +9,9 @@
       ]
     }
   ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/acortador", "destination": "/api/panel.js" },
-    { "source": "/acortador/", "destination": "/api/panel.js" },
-    { "source": "/:slug([a-zA-Z0-9-_]+)", "destination": "/api/index.js" }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/acortador", "dest": "/api/panel.js" },
+    { "src": "/([a-zA-Z0-9-_]+)", "dest": "/api/index.js" }
   ]
 }
