@@ -1,105 +1,68 @@
-import { Redis } from "@upstash/redis";
+import { Redis } from '@upstash/redis'
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
-// 1. Las palabras reservadas se quedan aquí arriba (Global)
-const RESERVED_SLUGS = ['acortador', 'api', 'public', 'static', 'index'];
+})
 
 export default async function handler(req, res) {
-  // Configuración de CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // 1. Configurar encabezados para evitar problemas de acceso
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const isGet = req.method === "GET";
-  const isPost = req.method === "POST";
+  const { slug, action } = req.query;
 
-  // Extraer datos del cuerpo (POST) o de la URL (GET)
-  let { action, slug, url } = isPost 
-    ? (typeof req.body === "string" ? JSON.parse(req.body) : req.body)
-    : req.query;
+  // --- LÓGICA DE REDIRECCIÓN (Cuando alguien entra a juteach.org/algo) ---
+  if (req.method === 'GET' && slug && !action) {
+    const cleanSlug = slug.toLowerCase().trim();
+    // BUSCAMOS CON EL PREFIJO "url:" QUE ES COMO SE GUARDA EN UPSTASH
+    const targetUrl = await redis.get(`url:${cleanSlug}`);
 
-  // 2. VALIDACIÓN: Evita que la API intente procesar rutas del sistema
-  if (slug && RESERVED_SLUGS.includes(slug.toLowerCase())) {
-    // Si es una petición administrativa (trae acción), avisamos del error
-    if (action) return res.status(400).json({ error: "Ruta reservada" });
-    // Si es una entrada normal al navegador, no hacemos nada para que Vercel use los archivos de /public
-    return; 
+    if (targetUrl) {
+      return res.redirect(301, targetUrl);
+    } else {
+      return res.status(404).json({ error: "Enlace no encontrado", buscado: cleanSlug });
+    }
   }
 
-  // --- 3. LÓGICA DE REDIRECCIÓN (Público) ---
-  if (isGet && !action && slug) {
-    const target = await redis.get(`url:${slug.toLowerCase()}`);
-    if (!target) return res.status(404).json({ error: "Enlace no encontrado" });
-    
-    // Redirección 301 (Permanente)
-    return res.redirect(301, target);
-  }
-
-  // Respuesta simple si entran a la raíz de la API
-  if (isGet && !action && !slug) {
-    return res.status(200).json({ ok: true, message: "juteach.org API activa" });
-  }
-
-  // --- 4. LÓGICA ADMINISTRATIVA (Requiere Auth) ---
+  // --- LÓGICA DEL PANEL (Crear, Listar, Borrar) ---
   const auth = req.headers.authorization;
-  if (!auth || auth !== `Bearer ${process.env.APP_PASSWORD}`) {
+  if (auth !== `Bearer ${process.env.APP_PASSWORD}`) {
     return res.status(401).json({ error: "No autorizado" });
   }
 
-  // ACCIÓN: LISTAR
-  if (action === "list") {
-    try {
-      const slugs = await redis.lrange("slugs", 0, -1);
-      if (slugs.length === 0) return res.status(200).json([]);
+  if (req.method === 'GET' && action === 'list') {
+    const keys = await redis.keys('url:*');
+    if (keys.length === 0) return res.json([]);
+    
+    const pipeline = redis.pipeline();
+    keys.forEach(k => pipeline.get(k));
+    const results = await pipeline.exec();
+    
+    const links = keys.map((k, i) => ({
+      slug: k.replace('url:', ''),
+      url: results[i]
+    }));
+    return res.json(links);
+  }
 
-      const keys = slugs.map(s => `url:${s}`);
-      const values = await redis.mget(...keys);
+  if (req.method === 'POST') {
+    const { action, url, slug: newSlug } = await req.body;
+    const cleanNewSlug = newSlug.toLowerCase().trim();
 
-      const links = slugs.map((s, index) => ({
-        slug: s, 
-        url: values[index] 
-      })).filter(l => l.url);
+    if (action === 'create') {
+      await redis.set(`url:${cleanNewSlug}`, url);
+      return res.json({ success: true, short: `https://juteach.org/${cleanNewSlug}` });
+    }
 
-      return res.status(200).json(links);
-    } catch (e) {
-      return res.status(500).json({ error: "Error al listar", detail: e.message });
+    if (action === 'delete') {
+      await redis.del(`url:${cleanNewSlug}`);
+      return res.json({ success: true });
     }
   }
 
-  // ACCIÓN: CREAR
-  if (action === "create") {
-    if (!slug || !url) return res.status(400).json({ error: "Faltan datos" });
-    const lowSlug = slug.toLowerCase().trim();
-    
-    if (RESERVED_SLUGS.includes(lowSlug)) {
-      return res.status(400).json({ error: "Este nombre está reservado" });
-    }
-
-    const exists = await redis.get(`url:${lowSlug}`);
-    if (exists) return res.status(409).json({ error: "El alias ya existe" });
-
-    await redis.set(`url:${lowSlug}`, url);
-    await redis.lpush("slugs", lowSlug);
-    
-    return res.status(200).json({ 
-      short: `https://juteach.org/${lowSlug}`
-    });
-  }
-
-  // ACCIÓN: ELIMINAR
-  if (action === "delete") {
-    if (!slug) return res.status(400).json({ error: "Slug requerido" });
-    const lowSlug = slug.toLowerCase().trim();
-    await redis.del(`url:${lowSlug}`);
-    await redis.lrem("slugs", 0, lowSlug);
-    return res.status(200).json({ ok: true });
-  }
-
-  return res.status(400).json({ error: "Acción no válida" });
+  return res.status(400).json({ error: "Petición no válida" });
 }
