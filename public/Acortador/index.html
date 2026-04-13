@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>juteach.org — Acortador & QR PRO</title>
+<script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;padding:2rem 1rem}
+  .wrap{max-width:750px;margin:0 auto}
+  .header{background:#1D9E75;border-radius:16px;padding:1.1rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:14px}
+  .header-icon{width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .header h1{font-size:17px;font-weight:500;color:#fff}
+  .header p{font-size:11px;color:rgba(255,255,255,.75);margin-top:1px}
+  .tabs{display:flex;gap:4px;margin-bottom:1.25rem;background:#e8e8e8;border-radius:12px;padding:4px}
+  .tab{flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:#666;transition:all .15s}
+  .tab.active{background:#fff;color:#085041;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .section{display:none}
+  .section.active{display:block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:#fff;border:0.5px solid #e0e0e0;border-radius:16px;padding:1.25rem 1.5rem; height: fit-content;}
+  .stitle{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+  label{font-size:12px;color:#666;display:block;margin-bottom:5px}
+  input[type=text],input[type=number],select{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:12px;outline:none}
+  input:focus{border-color:#1D9E75}
+  .alias-wrap{display:flex;border:1.5px solid #5DCAA5;border-radius:10px;overflow:hidden;margin-bottom:4px}
+  .alias-pre{padding:9px 10px;font-size:12px;color:#0F6E56;background:#E1F5EE;white-space:nowrap;border-right:1px solid #9FE1CB}
+  .alias-wrap input{border:none;border-radius:0;outline:none;padding-left:8px;margin:0;flex:1}
+  .hint{font-size:11px;color:#aaa;margin-bottom:12px}
+  .btn{border:none;border-radius:10px;font-weight:500;cursor:pointer;font-size:13px;padding:11px 20px;transition:all .15s;width:100%}
+  .btn-primary{background:#1D9E75;color:#fff}
+  .btn-primary:hover{background:#0F6E56}
+  .btn-ghost{background:#E1F5EE;color:#085041;border:1px solid #9FE1CB;padding:6px 12px;width:auto}
+  .btn-danger{background:transparent;color:#A32D2D;border:1px solid #F09595;padding:6px 12px;width:auto}
+  .error{background:#FCEBEB;border:1px solid #F09595;border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#791F1F;display:none}
+  .success-box{background:#E1F5EE;border:1px solid #5DCAA5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:none}
+  .link-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  .link-info{flex:1;min-width:0}
+  .link-short{font-size:14px;font-weight:500;color:#0F6E56}
+  .link-url{font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qr-colors{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .color-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+  .color-dot.active{border-color:#1D9E75;box-shadow:0 0 0 1px #1D9E75}
+  .qr-styles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .style-btn{padding:6px 8px;border-radius:9px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:11px;cursor:pointer}
+  .style-btn.active{border-color:#1D9E75;background:#E1F5EE;color:#085041}
+  .upload-zone{border:1.5px dashed #5DCAA5;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#E1F5EE;margin-bottom:12px;font-size:11px}
+  .qr-preview-area{text-align:center;margin-top:15px; background: #fafafa; border-radius: 12px; padding: 15px; border: 1px solid #eee;}
+  #qr-container canvas { max-width: 100%; height: auto !important; border-radius: 8px; }
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="header-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </div>
+    <div>
+      <h1>juteach.org</h1>
+      <p>Profesor · Coach · Tecnología</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('inicio')">Inicio / Generador</button>
+    <button class="tab" onclick="showTab('enlaces')">Mis enlaces</button>
+  </div>
+
+  <div id="tab-inicio" class="section active">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="stitle">1. Acortar Enlace</div>
+          <label>URL Destino</label>
+          <input type="text" id="url-input" placeholder="https://youtube.com/watch?..."/>
+          <label>Alias (Slug)</label>
+          <div class="alias-wrap">
+            <span class="alias-pre">juteach.org/</span>
+            <input type="text" id="slug-input" placeholder="mi-clase"/>
+          </div>
+          <div class="hint">Ej: /clase-01, /recurso-pdf</div>
+          <div class="error" id="error-msg"></div>
+          
+          <div class="success-box" id="success-box">
+            <div style="font-size:11px; color:#0F6E56; font-weight:600">¡Listo! Enlace creado:</div>
+            <div id="success-link" style="font-size:14px; font-weight:bold; margin:5px 0; color:#085041"></div>
+            <div style="display:flex; gap:5px">
+              <button class="btn btn-ghost" onclick="copyLink()">Copiar</button>
+              <button class="btn btn-ghost" onclick="sendToQR()">Usar en QR</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="create-btn" onclick="createLink()">Generar Enlace Corto</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="stitle">2. Personalizar QR</div>
+          <label>Texto o URL del QR</label>
+          <input type="text" id="qr-url" placeholder="https://juteach.org/..." oninput="updateQR()"/>
+          
+          <label>Estilo de puntos</label>
+          <div class="qr-styles">
+            <button class="style-btn active" onclick="setQRStyle('square',this)">Cuadrado</button>
+            <button class="style-btn" onclick="setQRStyle('dots',this)">Puntos</button>
+            <button class="style-btn" onclick="setQRStyle('rounded',this)">Redondo</button>
+            <button class="style-btn" onclick="setQRStyle('extra-rounded',this)">Diamante</button>
+          </div>
+
+          <label>Color Principal</label>
+          <div class="qr-colors" id="qr-colors"></div>
+          
+          <label>Imagen Central (Logo)</label>
+          <div class="upload-zone" onclick="document.getElementById('qr-img').click()">
+            <span id="img-label">Subir Logo .PNG / .JPG</span>
+          </div>
+          <input type="file" id="qr-img" accept="image/*" style="display:none" onchange="loadLogo(this)"/>
+
+          <div class="qr-preview-area" id="qr-preview-box" style="display:none">
+            <div id="qr-container"></div>
+            <button class="btn btn-primary" style="margin-top:10px" onclick="downloadQR()">Descargar en Alta Resolución</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-enlaces" class="section">
+    <div style="display:flex;justify-content:space-between;margin-bottom:15px">
+      <span id="links-count" style="font-size:13px;color:#666">Cargando...</span>
+      <button class="btn btn-ghost" onclick="loadLinks()">Actualizar</button>
+    </div>
+    <div id="links-list"></div>
+  </div>
+</div>
+
+<script>
+const PWD = "-Acortador2026";
+const API_URL = "/api/index.js";
+const HEADERS = {"Content-Type":"application/json","Authorization":"Bearer "+PWD};
+
+let allLinks = [];
+let currentQRConfig = {
+    color: "#1D9E75",
+    bg: "#ffffff",
+    style: "square",
+    logo: ""
+};
+
+// 1. INICIALIZAR LIBRERÍA QR
+const qrCode = new QRCodeStyling({
+    width: 300,
+    height: 300,
+    margin: 10,
+    dotsOptions: { color: "#1D9E75", type: "square" },
+    backgroundOptions: { color: "#ffffff" },
+    imageOptions: { crossOrigin: "anonymous", margin: 5, imageSize: 0.4 }
+});
+
+// 2. COLORES
+const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
+function initUi(){
+    const container = document.getElementById("qr-colors");
+    COLORS.forEach((c, i) => {
+        const d = document.createElement("div");
+        d.className = "color-dot" + (i===0?" active":"");
+        d.style.background = c;
+        d.onclick = () => {
+            document.querySelectorAll(".color-dot").forEach(x=>x.classList.remove("active"));
+            d.classList.add("active");
+            currentQRConfig.color = c;
+            updateQR();
+        };
+        container.appendChild(d);
+    });
+}
+
+// 3. LÓGICA DE PESTAÑAS
+function showTab(t){
+    document.querySelectorAll(".tab, .section").forEach(el => el.classList.remove("active"));
+    event.currentTarget?.classList?.add("active") || document.querySelector(`[onclick="showTab('${t}')"]`).classList.add("active");
+    document.getElementById("tab-"+t).classList.add("active");
+    if(t==='enlaces') loadLinks();
+}
+
+// 4. LÓGICA DEL ACORTADOR (API)
+async function loadLinks(){
+    const res = await fetch(`${API_URL}?action=list`, {headers: HEADERS});
+    allLinks = await res.json();
+    renderLinks();
+}
+
+function renderLinks(){
+    const list = document.getElementById("links-list");
+    document.getElementById("links-count").textContent = `${allLinks.length} enlaces activos`;
+    list.innerHTML = allLinks.map(lk => `
+        <div class="link-card">
+            <div class="link-info">
+                <div class="link-short">juteach.org/${lk.slug}</div>
+                <div class="link-url">${lk.url}</div>
+            </div>
+            <div style="display:flex; gap:5px">
+                <button class="btn btn-ghost" onclick="useInQR('https://juteach.org/${lk.slug}')">QR</button>
+                <button class="btn btn-danger" onclick="deleteLink('${lk.slug}')">Eliminar</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+async function createLink(){
+    const url = document.getElementById("url-input").value.trim();
+    const slug = document.getElementById("slug-input").value.trim();
+    if(!url || !slug) return alert("Completa los campos");
+
+    const btn = document.getElementById("create-btn");
+    btn.disabled = true; btn.textContent = "Procesando...";
+
+    try {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            headers: HEADERS,
+            body: JSON.stringify({ action: "create", url, slug })
+        });
+        const data = await res.json();
+        if(data.error) alert(data.error);
+        else {
+            document.getElementById("success-link").textContent = data.short;
+            document.getElementById("success-box").style.display = "block";
+            loadLinks();
+        }
+    } catch (e) { alert("Error de conexión"); }
+    btn.disabled = false; btn.textContent = "Generar Enlace Corto";
+}
+
+async function deleteLink(s){
+    if(!confirm("¿Eliminar este enlace?")) return;
+    await fetch(API_URL, { method: "POST", headers: HEADERS, body: JSON.stringify({ action:"delete", slug:s })});
+    loadLinks();
+}
+
+// 5. LÓGICA DEL QR PRO
+function updateQR(){
+    const val = document.getElementById("qr-url").value.trim();
+    if(!val) return;
+    
+    document.getElementById("qr-preview-box").style.display = "block";
+    const container = document.getElementById("qr-container");
+    container.innerHTML = ""; // Limpiar
+
+    qrCode.update({
+        data: val,
+        dotsOptions: { color: currentQRConfig.color, type: currentQRConfig.style },
+        image: currentQRConfig.logo
+    });
+    qrCode.append(container);
+}
+
+function setQRStyle(s, btn){
+    document.querySelectorAll(".style-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentQRConfig.style = s;
+    updateQR();
+}
+
+function loadLogo(input){
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+        currentQRConfig.logo = e.target.result;
+        document.getElementById("img-label").textContent = "Logo cargado ✓";
+        updateQR();
+    };
+    reader.readAsDataURL(file);
+}
+
+function downloadQR(){
+    qrCode.download({ name: "qr-juteach", extension: "png" });
+}
+
+// Helpers
+function copyLink(){ navigator.clipboard.writeText(document.getElementById("success-link").textContent); alert("Copiado!"); }
+function sendToQR(){ useInQR(document.getElementById("success-link").textContent); }
+function useInQR(url){ 
+    document.getElementById("qr-url").value = url; 
+    showTab('inicio'); 
+    updateQR();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Inicio
+initUi();
+loadLinks();
+</script>
+</body>
+</html>
