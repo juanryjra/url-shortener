@@ -5,72 +5,88 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// Lista de rutas que el acortador NO debe intentar procesar como links
+const RESERVED_SLUGS = ['acortador', 'api', 'public', 'static'];
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   const isGet = req.method === "GET";
   const isPost = req.method === "POST";
 
-  let action, slug, url;
+  let { action, slug, url } = isPost 
+    ? (typeof req.body === "string" ? JSON.parse(req.body) : req.body)
+    : req.query;
 
-  if (isPost) {
-    try {
-      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-      action = body.action;
-      slug = body.slug;
-      url = body.url;
-    } catch {
-      return res.status(400).json({ error: "Body inválido" });
-    }
-  } else {
-    action = req.query.action;
-    slug = req.query.slug;
-    url = req.query.url;
-  }
-
+  // 1. Lógica de Redirección (Público)
   if (isGet && !action && slug) {
+    // Si es una palabra reservada, salimos para no gastar recursos
+    if (RESERVED_SLUGS.includes(slug.toLowerCase())) return;
+
     const target = await redis.get(`url:${slug}`);
     if (!target) return res.status(404).json({ error: "Enlace no encontrado" });
+    
+    // 301 es mejor para SEO y velocidad
     return res.redirect(301, target);
   }
 
+  // Si entran a la raíz de la API sin slug
   if (isGet && !action && !slug) {
     return res.status(200).json({ ok: true, message: "juteach.org API activa" });
   }
 
+  // 2. Lógica Administrativa (Requiere Auth)
   const auth = req.headers.authorization;
   if (!auth || auth !== `Bearer ${process.env.APP_PASSWORD}`) {
     return res.status(401).json({ error: "No autorizado" });
   }
 
+  // ACCIÓN: LISTAR (Optimizado con MGET)
   if (action === "list") {
     try {
       const slugs = await redis.lrange("slugs", 0, -1);
-      const links = await Promise.all(
-        slugs.map(async (s) => ({ slug: s, url: await redis.get(`url:${s}`) }))
-      );
-      return res.status(200).json(links.filter(l => l.url));
+      if (slugs.length === 0) return res.status(200).json([]);
+
+      // Traemos todos los valores de una sola vez
+      const keys = slugs.map(s => `url:${s}`);
+      const values = await redis.mget(...keys);
+
+      const links = slugs.map((s, index) => ({
+        slug: s,
+        url: values[index]
+      })).filter(l => l.url);
+
+      return res.status(200).json(links);
     } catch (e) {
       return res.status(500).json({ error: "Error al listar", detail: e.message });
     }
   }
 
+  // ACCIÓN: CREAR
   if (action === "create") {
-    if (!slug || !url) return res.status(400).json({ error: "Slug y URL requeridos" });
+    if (!slug || !url) return res.status(400).json({ error: "Faltan datos" });
+    
+    if (RESERVED_SLUGS.includes(slug.toLowerCase())) {
+      return res.status(400).json({ error: "Este nombre está reservado" });
+    }
+
     const exists = await redis.get(`url:${slug}`);
-    if (exists) return res.status(409).json({ error: "Ese alias ya existe" });
+    if (exists) return res.status(409).json({ error: "El alias ya existe" });
+
     await redis.set(`url:${slug}`, url);
     await redis.lpush("slugs", slug);
-    return res.status(200).json({ short: `${process.env.APP_URL}/${slug}` });
+    
+    return res.status(200).json({ 
+      short: `https://juteach.org/${slug}`,
+      qr: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://juteach.org/${slug}`
+    });
   }
 
+  // ACCIÓN: ELIMINAR
   if (action === "delete") {
     if (!slug) return res.status(400).json({ error: "Slug requerido" });
     await redis.del(`url:${slug}`);
