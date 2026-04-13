@@ -17,8 +17,17 @@
     }
   ],
   "rewrites": [
-    { "source": "/Acortador", "destination": "/Acortador/index.html" },
-    { "source": "/api/panel", "destination": "/api/index.js" },
-    { "source": "/:slug", "destination": "/api/index.js" }
+    { 
+      "source": "/Acortador", 
+      "destination": "/Acortador/index.html" 
+    },
+    { 
+      "source": "/api/:path*", 
+      "destination": "/api/index.js" 
+    },
+    { 
+      "source": "/:slug([a-zA-Z0-9_-]{2,})", 
+      "destination": "/api/index.js?slug=$slug" 
+    }
   ]
 }
