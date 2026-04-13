@@ -1,159 +1,101 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>juteach.org — Tecnología & Educación</title>
-    <style>
-        :root {
-            --primary: #1D9E75;
-            --primary-dark: #085041;
-            --bg: #ffffff;
-            --text: #333333;
-            --text-light: #666666;
-        }
+import { Redis } from "@upstash/redis";
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
+// Palabras que nadie puede usar como link corto para no romper tu web
+const RESERVED_SLUGS = ['acortador', 'api', 'public', 'static', 'admin', 'index'];
 
-        /* Fondo sutil con gradiente */
-        body::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at 10% 20%, rgba(29, 158, 117, 0.05) 0%, transparent 50%),
-                        radial-gradient(circle at 90% 80%, rgba(8, 80, 65, 0.05) 0%, transparent 50%);
-            z-index: -1;
-        }
+export default async function handler(req, res) {
+  // Configuración de CORS para que tu frontend pueda hablar con la API
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-        .container {
-            text-align: center;
-            padding: 2rem;
-            max-width: 600px;
-            animation: fadeIn 1s ease-out;
-        }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+  const isGet = req.method === "GET";
+  const isPost = req.method === "POST";
 
-        .logo {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 2rem;
-            display: inline-block;
-        }
+  // Capturar datos sin importar si vienen por URL o por el cuerpo del mensaje
+  let { action, slug, url } = isPost 
+    ? (typeof req.body === "string" ? JSON.parse(req.body) : req.body)
+    : req.query;
 
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--primary-dark);
-            line-height: 1.2;
-        }
+  // --- 1. LÓGICA DE REDIRECCIÓN (Público) ---
+  if (isGet && !action && slug) {
+    const lowerSlug = slug.toLowerCase();
+    
+    // Si intentan usar una palabra reservada, no hacemos nada
+    if (RESERVED_SLUGS.includes(lowerSlug)) return;
 
-        p {
-            font-size: 1.1rem;
-            color: var(--text-light);
-            line-height: 1.6;
-            margin-bottom: 2.5rem;
-        }
+    const target = await redis.get(`url:${lowerSlug}`);
+    if (!target) return res.status(404).json({ error: "Enlace no encontrado" });
+    
+    // Redirección permanente (301) para máxima velocidad
+    return res.redirect(301, target);
+  }
 
-        .services {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            align-items: center;
-        }
+  // Respuesta simple si entran a la API directamente
+  if (isGet && !action && !slug) {
+    return res.status(200).json({ ok: true, message: "juteach.org API activa" });
+  }
 
-        /* El enlace principal */
-        .btn-acortador {
-            text-decoration: none;
-            color: white;
-            background-color: var(--primary);
-            padding: 14px 32px;
-            border-radius: 50px;
-            font-weight: 500;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(29, 158, 117, 0.3);
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
+  // --- 2. LÓGICA ADMINISTRATIVA (Requiere Contraseña) ---
+  const auth = req.headers.authorization;
+  if (!auth || auth !== `Bearer ${process.env.APP_PASSWORD}`) {
+    return res.status(401).json({ error: "No autorizado" });
+  }
 
-        .btn-acortador:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(8, 80, 65, 0.4);
-        }
+  // ACCIÓN: LISTAR ENLACES (Optimizado con MGET)
+  if (action === "list") {
+    try {
+      const slugs = await redis.lrange("slugs", 0, -1);
+      if (slugs.length === 0) return res.status(200).json([]);
 
-        .coming-soon {
-            font-size: 0.9rem;
-            color: #aaa;
-            font-style: italic;
-            margin-top: 1rem;
-        }
+      const keys = slugs.map(s => `url:${s}`);
+      const values = await redis.mget(...keys);
 
-        footer {
-            position: absolute;
-            bottom: 2rem;
-            font-size: 0.8rem;
-            color: #ccc;
-        }
+      const links = slugs.map((s, index) => ({
+        slug: s,
+        url: values[index]
+      })).filter(l => l.url);
 
-        /* Responsive */
-        @media (max-width: 480px) {
-            h1 { font-size: 1.8rem; }
-            p { font-size: 1rem; }
-        }
-    </style>
-</head>
-<body>
+      return res.status(200).json(links);
+    } catch (e) {
+      return res.status(500).json({ error: "Error al listar", detail: e.message });
+    }
+  }
 
-    <div class="container">
-        <div class="logo">juteach.org</div>
-        
-        <h1>Tecnología, Educación <br>& Soluciones Digitales</h1>
-        
-        <p>
-            Estamos construyendo un espacio para potenciar el aprendizaje y la gestión tecnológica. 
-            Por ahora, puedes utilizar nuestra herramienta profesional de:
-        </p>
+  // ACCIÓN: CREAR ENLACE
+  if (action === "create") {
+    if (!slug || !url) return res.status(400).json({ error: "Faltan datos" });
+    const cleanSlug = slug.toLowerCase().replace(/[^a-zA-Z0-9-_]/g, "");
 
-        <div class="services">
-            <a href="/Acortador" class="btn-acortador">
-                <span>Acortador de Enlaces & QR</span>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-            </a>
-            
-            <div class="coming-soon">
-                Próximamente: Más herramientas y recursos educativos.
-            </div>
-        </div>
-    </div>
+    if (RESERVED_SLUGS.includes(cleanSlug)) {
+      return res.status(400).json({ error: "Este nombre está reservado" });
+    }
 
-    <footer>
-        &copy; 2026 juteach.org | Bogotá, Colombia
-    </footer>
+    const exists = await redis.get(`url:${cleanSlug}`);
+    if (exists) return res.status(409).json({ error: "El alias ya existe" });
 
-</body>
-</html>
+    await redis.set(`url:${cleanSlug}`, url);
+    await redis.lpush("slugs", cleanSlug);
+    
+    return res.status(200).json({ 
+      short: `https://juteach.org/${cleanSlug}`
+    });
+  }
+
+  // ACCIÓN: ELIMINAR ENLACE
+  if (action === "delete") {
+    if (!slug) return res.status(400).json({ error: "Slug requerido" });
+    await redis.del(`url:${slug}`);
+    await redis.lrem("slugs", 0, slug);
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(400).json({ error: "Acción no válida" });
+}
