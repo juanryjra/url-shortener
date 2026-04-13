@@ -7,6 +7,9 @@ const redis = new Redis({
 
 // Lista de rutas que el acortador NO debe intentar procesar como links
 const RESERVED_SLUGS = ['acortador', 'api', 'public', 'static'];
+if (slug && RESERVED_SLUGS.includes(slug.toLowerCase())) {
+  return res.status(200).json({ ok: true, info: "Ruta reservada" });
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
