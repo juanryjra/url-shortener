@@ -9,9 +9,25 @@
       ]
     }
   ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.js" },
-    { "src": "/acortador", "dest": "/api/panel.js" },
-    { "src": "/([a-zA-Z0-9-_]+)", "dest": "/api/index.js" }
+  "redirects": [
+    {
+      "source": "/(?i)acortador",
+      "destination": "/Acortador",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    { 
+      "source": "/Acortador", 
+      "destination": "/Acortador/index.html" 
+    },
+    { 
+      "source": "/api/panel", 
+      "destination": "/api/panel.js" 
+    },
+    { 
+      "source": "/:slug", 
+      "destination": "/api/index.js" 
+    }
   ]
 }
