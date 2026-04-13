@@ -9,21 +9,10 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/(?i)acortador",
-      "destination": "/Acortador",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     { 
       "source": "/Acortador", 
       "destination": "/Acortador/index.html" 
-    },
-    { 
-      "source": "/Acortador/:path*", 
-      "destination": "/Acortador/:path*" 
     },
     { 
       "source": "/api/:path*", 
