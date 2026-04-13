@@ -9,6 +9,13 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/acortador",
+      "destination": "/Acortador",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { 
       "source": "/Acortador", 
