@@ -1,0 +1,24 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization" }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(?i)acortador",
+      "destination": "/Acortador",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    { "source": "/Acortador", "destination": "/Acortador/index.html" },
+    { "source": "/api/panel", "destination": "/api/index.js" },
+    { "source": "/:slug", "destination": "/api/index.js" }
+  ]
+}
