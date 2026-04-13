@@ -19,31 +19,34 @@ export default async function handler(req, res) {
   const isGet = req.method === "GET";
   const isPost = req.method === "POST";
 
+  // Extraer datos del cuerpo (POST) o de la URL (GET)
   let { action, slug, url } = isPost 
     ? (typeof req.body === "string" ? JSON.parse(req.body) : req.body)
     : req.query;
 
-  // 2. LA VALIDACIÓN DEBE IR AQUÍ (Dentro del handler)
+  // 2. VALIDACIÓN: Evita que la API intente procesar rutas del sistema
   if (slug && RESERVED_SLUGS.includes(slug.toLowerCase())) {
-    // Si es una petición GET normal (navegador), no respondemos nada para que Vercel 
-    // siga buscando en la carpeta /public. Si es API, avisamos.
+    // Si es una petición administrativa (trae acción), avisamos del error
     if (action) return res.status(400).json({ error: "Ruta reservada" });
+    // Si es una entrada normal al navegador, no hacemos nada para que Vercel use los archivos de /public
     return; 
   }
 
-  // --- LÓGICA DE REDIRECCIÓN ---
+  // --- 3. LÓGICA DE REDIRECCIÓN (Público) ---
   if (isGet && !action && slug) {
     const target = await redis.get(`url:${slug.toLowerCase()}`);
     if (!target) return res.status(404).json({ error: "Enlace no encontrado" });
+    
+    // Redirección 301 (Permanente)
     return res.redirect(301, target);
   }
 
-  // Raíz de la API
+  // Respuesta simple si entran a la raíz de la API
   if (isGet && !action && !slug) {
     return res.status(200).json({ ok: true, message: "juteach.org API activa" });
   }
 
-  // --- SEGURIDAD ---
+  // --- 4. LÓGICA ADMINISTRATIVA (Requiere Auth) ---
   const auth = req.headers.authorization;
   if (!auth || auth !== `Bearer ${process.env.APP_PASSWORD}`) {
     return res.status(401).json({ error: "No autorizado" });
@@ -54,9 +57,15 @@ export default async function handler(req, res) {
     try {
       const slugs = await redis.lrange("slugs", 0, -1);
       if (slugs.length === 0) return res.status(200).json([]);
+
       const keys = slugs.map(s => `url:${s}`);
       const values = await redis.mget(...keys);
-      const links = slugs.map((s, index) => ({ slug: s, url: values[index] })).filter(l => l.url);
+
+      const links = slugs.map((s, index) => ({
+        slug: s, 
+        url: values[index] 
+      })).filter(l => l.url);
+
       return res.status(200).json(links);
     } catch (e) {
       return res.status(500).json({ error: "Error al listar", detail: e.message });
@@ -66,7 +75,7 @@ export default async function handler(req, res) {
   // ACCIÓN: CREAR
   if (action === "create") {
     if (!slug || !url) return res.status(400).json({ error: "Faltan datos" });
-    const lowSlug = slug.toLowerCase();
+    const lowSlug = slug.toLowerCase().trim();
     
     if (RESERVED_SLUGS.includes(lowSlug)) {
       return res.status(400).json({ error: "Este nombre está reservado" });
@@ -86,8 +95,9 @@ export default async function handler(req, res) {
   // ACCIÓN: ELIMINAR
   if (action === "delete") {
     if (!slug) return res.status(400).json({ error: "Slug requerido" });
-    await redis.del(`url:${slug.toLowerCase()}`);
-    await redis.lrem("slugs", 0, slug.toLowerCase());
+    const lowSlug = slug.toLowerCase().trim();
+    await redis.del(`url:${lowSlug}`);
+    await redis.lrem("slugs", 0, lowSlug);
     return res.status(200).json({ ok: true });
   }
 
