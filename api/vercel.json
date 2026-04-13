@@ -17,17 +17,8 @@
     }
   ],
   "rewrites": [
-    { 
-      "source": "/Acortador", 
-      "destination": "/Acortador/index.html" 
-    },
-    { 
-      "source": "/api/panel", 
-      "destination": "/api/panel.js" 
-    },
-    { 
-      "source": "/:slug", 
-      "destination": "/api/index.js" 
-    }
+    { "source": "/Acortador", "destination": "/Acortador/index.html" },
+    { "source": "/api/panel", "destination": "/api/index.js" },
+    { "source": "/:slug", "destination": "/api/index.js" }
   ]
 }
