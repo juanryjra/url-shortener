@@ -22,11 +22,15 @@
       "destination": "/Acortador/index.html" 
     },
     { 
+      "source": "/Acortador/:path*", 
+      "destination": "/Acortador/:path*" 
+    },
+    { 
       "source": "/api/:path*", 
       "destination": "/api/index.js" 
     },
     { 
-      "source": "/:slug([a-zA-Z0-9_-]{2,})", 
+      "source": "/:slug", 
       "destination": "/api/index.js?slug=$slug" 
     }
   ]
