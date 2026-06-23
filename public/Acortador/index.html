@@ -440,6 +440,7 @@ let currentSession = null;
 let allLinks = [];
 let siteUrl = "https://juteach.org";
 let currentQRConfig = { color:"#1D9E75", bg:"#ffffff", style:"square", logo:"" };
+let isRecoveryMode = false;
 
 const qrCode = new QRCodeStyling({
   width:300, height:300, margin:10,
@@ -545,7 +546,7 @@ function showForgotPassword(){
   hideMessage("login-msg");
   const email=$("login-email").value.trim();
   if(!email) return showMessage("login-msg","Escribe primero tu correo y luego toca este botón.");
-  supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/Acortador#type=recovery`})
+  supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/Acortador`})
     .then(({error})=>{
       if(error) showMessage("login-msg",error.message);
       else showMessage("login-msg","Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.","success");
@@ -571,8 +572,11 @@ async function initApp(){
     supabaseClient.auth.onAuthStateChange((event,session)=>{
       currentSession=session;
       if(event==="PASSWORD_RECOVERY"){
-        // Mostrar solo el formulario de nueva contraseña
+        isRecoveryMode=true;
         showRecoveryView();
+      } else if(event==="USER_UPDATED" && isRecoveryMode){
+        // Contraseña actualizada — ir al login
+        isRecoveryMode=false;
       } else {
         renderAuthState();
       }
@@ -599,8 +603,7 @@ function showRecoveryView(){
 
 async function renderAuthState(){
   appReady();
-  const recoveryMode=window.location.hash.includes("type=recovery")||window.location.search.includes("type=recovery");
-  if(recoveryMode && currentSession){ showRecoveryView(); return; }
+  if(isRecoveryMode){ showRecoveryView(); return; }
   $("recovery-view").style.display="none";
 
   if(!currentSession){
