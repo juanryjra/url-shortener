@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const MAX_LINKS_PER_USER = Number(process.env.MAX_LINKS_PER_USER || 100)
 const SITE_URL = process.env.PUBLIC_SITE_URL || 'https://juteach.org'
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase().trim()
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -59,9 +60,33 @@ function getBearerToken(req) {
   return auth.slice(7).trim()
 }
 
-function isAdmin(req) {
-  const token = getBearerToken(req)
-  return Boolean(process.env.APP_PASSWORD && token === process.env.APP_PASSWORD)
+async function isAdmin(req, res) {
+  // Capa 1: APP_PASSWORD en header X-Admin-Key
+  const adminKey = (req.headers['x-admin-key'] || '').trim()
+  if (!process.env.APP_PASSWORD || adminKey !== process.env.APP_PASSWORD) {
+    if (res) res.status(401).json({ error: 'Clave de administrador no válida.' })
+    return false
+  }
+
+  // Capa 2: el Bearer token debe ser un JWT de Supabase con el correo admin
+  if (ADMIN_EMAIL) {
+    const token = getBearerToken(req)
+    if (!token) {
+      if (res) res.status(401).json({ error: 'Se requiere sesión activa para acciones de admin.' })
+      return false
+    }
+    const { data, error } = await supabase.auth.getUser(token)
+    if (error || !data?.user) {
+      if (res) res.status(401).json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' })
+      return false
+    }
+    if (data.user.email.toLowerCase() !== ADMIN_EMAIL) {
+      if (res) res.status(403).json({ error: 'No tienes permisos de administrador.' })
+      return false
+    }
+  }
+
+  return true
 }
 
 function requireSupabase(res) {
@@ -294,19 +319,19 @@ export default async function handler(req, res) {
   if (!requireSupabase(res)) return
 
   if (action === 'admin-invites') {
-    if (!isAdmin(req)) return res.status(401).json({ error: 'Clave de administrador no válida.' })
+    if (!await isAdmin(req, res)) return
     return listInvites(res)
   }
 
   const body = await readBody(req)
 
   if (req.method === 'POST' && body.action === 'admin-create-invite') {
-    if (!isAdmin(req)) return res.status(401).json({ error: 'Clave de administrador no válida.' })
+    if (!await isAdmin(req, res)) return
     return createInvite(body, res)
   }
 
   if (req.method === 'POST' && body.action === 'admin-delete-invite') {
-    if (!isAdmin(req)) return res.status(401).json({ error: 'Clave de administrador no válida.' })
+    if (!await isAdmin(req, res)) return
     return deleteInvite(body, res)
   }
 

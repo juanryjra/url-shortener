@@ -109,7 +109,7 @@
   <div class="tabs" id="tabs">
     <button class="tab active" onclick="showTab('inicio', this)">Inicio / Generador</button>
     <button class="tab" onclick="showTab('enlaces', this)">Mis enlaces</button>
-    <button class="tab" onclick="showTab('admin', this)">Admin</button>
+    <button class="tab" id="tab-btn-admin" style="display:none" onclick="showTab('admin', this)">Admin</button>
   </div>
 
   <div id="tab-inicio" class="section active">
@@ -197,6 +197,7 @@
 <script>
 const API_URL = "/api";
 const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
+const ADMIN_EMAIL = "profejuanry@gmail.com";
 const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
 
 let supabaseClient = null;
@@ -229,7 +230,11 @@ function authHeaders(){
   return {"Content-Type":"application/json","Authorization":"Bearer "+currentSession.access_token};
 }
 function adminHeaders(){
-  return {"Content-Type":"application/json","Authorization":"Bearer "+$("admin-password").value.trim()};
+  return {
+    "Content-Type":"application/json",
+    "Authorization":"Bearer "+currentSession.access_token,
+    "X-Admin-Key": $("admin-password").value.trim()
+  };
 }
 
 async function initApp(){
@@ -281,6 +286,10 @@ async function renderAuthState(){
   $("user-chip").style.display = "flex";
   $("user-email").textContent = currentSession.user.email;
   document.querySelectorAll(".section").forEach(el => el.style.display = "");
+
+  // Mostrar pestaña Admin solo al correo administrador
+  const isAdmin = currentSession.user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  $("tab-btn-admin").style.display = isAdmin ? "" : "none";
 
   if(inviteFromUrl){
     await claimInvite();
