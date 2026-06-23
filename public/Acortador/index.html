@@ -219,17 +219,39 @@
   </div>
 
   <!-- ══════════ VISTA: RECUPERAR CONTRASEÑA ══════════ -->
-  <div id="recovery-view" class="card" style="display:none;max-width:420px;margin:0 auto 14px">
-    <div class="stitle">Crear nueva contraseña</div>
-    <div id="recovery-msg" class="message error"></div>
-    <label>Nueva contraseña</label>
-    <div class="pass-wrap">
-      <input type="password" id="new-password" placeholder="Mínimo 8 caracteres, segura"/>
-      <button type="button" class="pass-toggle" onclick="togglePass('new-password',this)" title="Mostrar contraseña">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
+  <div id="recovery-view" style="display:none;max-width:440px;margin:0 auto">
+    <div class="card welcome-card" style="background:linear-gradient(135deg,#185FA5,#085041)">
+      <div class="welcome-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      </div>
+      <h2>Restablecer contraseña</h2>
+      <p>Crea una nueva contraseña segura para tu cuenta en juteach.org.</p>
     </div>
-    <button class="btn btn-primary" onclick="updatePassword()">Guardar nueva contraseña</button>
+    <div class="card">
+      <div id="recovery-msg" class="message error"></div>
+      <label>Nueva contraseña</label>
+      <div class="pass-wrap">
+        <input type="password" id="new-password" placeholder="Mínimo 8 caracteres" oninput="onRecoveryPasswordInput(this)"/>
+        <button type="button" class="pass-toggle" onclick="togglePass('new-password',this)" title="Mostrar contraseña">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="recovery-strength-fill"></div></div>
+      <div class="reqs" style="margin-bottom:14px">
+        <span class="req" id="rec-req-len"><span class="chk"></span>Mínimo 8 caracteres</span>
+        <span class="req" id="rec-req-upper"><span class="chk"></span>Una mayúscula (A-Z)</span>
+        <span class="req" id="rec-req-num"><span class="chk"></span>Un número (0-9)</span>
+        <span class="req" id="rec-req-sym"><span class="chk"></span>Un símbolo (!@#$...)</span>
+      </div>
+      <label>Confirmar nueva contraseña</label>
+      <div class="pass-wrap">
+        <input type="password" id="confirm-password" placeholder="Repite la contraseña"/>
+        <button type="button" class="pass-toggle" onclick="togglePass('confirm-password',this)" title="Mostrar contraseña">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <button class="btn btn-primary" onclick="updatePassword()">Actualizar contraseña</button>
+    </div>
   </div>
 
   <!-- ══════════ MODAL: TÉRMINOS Y CONDICIONES ══════════ -->
@@ -520,7 +542,7 @@ function showForgotPassword(){
   hideMessage("login-msg");
   const email=$("login-email").value.trim();
   if(!email) return showMessage("login-msg","Escribe primero tu correo y luego toca este botón.");
-  supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/Acortador`})
+  supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/Acortador#type=recovery`})
     .then(({error})=>{
       if(error) showMessage("login-msg",error.message);
       else showMessage("login-msg","Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.","success");
@@ -543,9 +565,14 @@ async function initApp(){
     $("limit-text").textContent=config.maxLinksPerUser||100;
     supabaseClient=supabase.createClient(config.supabaseUrl,config.supabaseAnonKey);
 
-    supabaseClient.auth.onAuthStateChange((_event,session)=>{
+    supabaseClient.auth.onAuthStateChange((event,session)=>{
       currentSession=session;
-      renderAuthState();
+      if(event==="PASSWORD_RECOVERY"){
+        // Mostrar solo el formulario de nueva contraseña
+        showRecoveryView();
+      } else {
+        renderAuthState();
+      }
     });
     const {data}=await supabaseClient.auth.getSession();
     currentSession=data.session;
@@ -555,9 +582,19 @@ async function initApp(){
   }
 }
 
+function showRecoveryView(){
+  $("login-view").style.display="none";
+  $("register-view").style.display="none";
+  $("tabs").style.display="none";
+  $("user-chip").style.display="none";
+  $("recovery-view").style.display="block";
+  document.querySelectorAll(".section").forEach(el=>el.style.display="none");
+}
+
 async function renderAuthState(){
   const recoveryMode=window.location.hash.includes("type=recovery")||window.location.search.includes("type=recovery");
-  $("recovery-view").style.display=recoveryMode&&currentSession?"block":"none";
+  if(recoveryMode && currentSession){ showRecoveryView(); return; }
+  $("recovery-view").style.display="none";
 
   if(!currentSession){
     // Sin sesión: mostrar login o registro según si hay invite
@@ -645,15 +682,33 @@ async function signOut(){
   window.location.href="/Acortador";
 }
 
+function onRecoveryPasswordInput(input){
+  const pw=input.value;
+  const r=checkStrength(pw);
+  const score=[r.len,r.upper,r.num,r.sym].filter(Boolean).length;
+  const fill=$("recovery-strength-fill");
+  if(fill) fill.className="strength-fill"+(score?` s${score}`:"");
+  const mark=(id,ok)=>{
+    const el=$(id); if(!el) return;
+    el.classList.toggle("ok",ok);
+    el.querySelector(".chk").style.background=ok?"#1D9E75":"";
+    el.querySelector(".chk").style.borderColor=ok?"#1D9E75":"#ddd";
+  };
+  mark("rec-req-len",r.len); mark("rec-req-upper",r.upper);
+  mark("rec-req-num",r.num); mark("rec-req-sym",r.sym);
+}
+
 async function updatePassword(){
   hideMessage("recovery-msg");
   const password=$("new-password").value;
+  const confirm=$("confirm-password").value;
   if(!password) return showMessage("recovery-msg","Escribe tu nueva contraseña.");
   if(!isPasswordStrong(password)) return showMessage("recovery-msg","La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
+  if(password!==confirm) return showMessage("recovery-msg","Las contraseñas no coinciden. Verifica que sean iguales.");
   const {error}=await supabaseClient.auth.updateUser({password});
   if(error) return showMessage("recovery-msg",error.message);
-  showMessage("recovery-msg","¡Contraseña actualizada! Ya puedes usar tu cuenta.","success");
-  setTimeout(()=>window.location.href="/Acortador",1400);
+  showMessage("recovery-msg","¡Contraseña actualizada correctamente! Redirigiendo al inicio de sesión...","success");
+  setTimeout(()=>window.location.href="/Acortador",2000);
 }
 
 async function claimInvite(){
