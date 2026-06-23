@@ -3,95 +3,138 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>juteach.org — Acortador & QR PRO</title>
-<script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+<title>juteach.org — Acortador & QR</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;padding:2rem 1rem}
-  .wrap{max-width:750px;margin:0 auto}
-  .header{background:#1D9E75;border-radius:16px;padding:1.1rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:14px}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;padding:2rem 1rem;color:#24302c}
+  .wrap{max-width:880px;margin:0 auto}
+  .header{background:#1D9E75;border-radius:16px;padding:1.1rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .brand{display:flex;align-items:center;gap:14px}
   .header-icon{width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .header h1{font-size:17px;font-weight:500;color:#fff}
-  .header p{font-size:11px;color:rgba(255,255,255,.75);margin-top:1px}
-  .tabs{display:flex;gap:4px;margin-bottom:1.25rem;background:#e8e8e8;border-radius:12px;padding:4px}
-  .tab{flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:#666;transition:all .15s}
+  .header h1{font-size:17px;font-weight:600;color:#fff}
+  .header p{font-size:11px;color:rgba(255,255,255,.82);margin-top:1px}
+  .user-chip{font-size:12px;color:#fff;background:rgba(255,255,255,.16);border-radius:999px;padding:8px 11px;display:none;gap:8px;align-items:center}
+  .tabs{display:none;gap:4px;margin-bottom:1.25rem;background:#e8e8e8;border-radius:12px;padding:4px}
+  .tab{flex:1;padding:9px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:#666;transition:all .15s}
   .tab.active{background:#fff;color:#085041;box-shadow:0 1px 4px rgba(0,0,0,.08)}
   .section{display:none}
   .section.active{display:block}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .card{background:#fff;border:0.5px solid #e0e0e0;border-radius:16px;padding:1.25rem 1.5rem; height: fit-content;}
-  .stitle{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+  .card{background:#fff;border:0.5px solid #e0e0e0;border-radius:16px;padding:1.25rem 1.5rem;height:fit-content;margin-bottom:14px}
+  .stitle{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
   label{font-size:12px;color:#666;display:block;margin-bottom:5px}
-  input[type=text],input[type=number],select{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:12px;outline:none}
+  input[type=text],input[type=email],input[type=password],input[type=number],select{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:12px;outline:none;background:#fff}
   input:focus{border-color:#1D9E75}
   .alias-wrap{display:flex;border:1.5px solid #5DCAA5;border-radius:10px;overflow:hidden;margin-bottom:4px}
-  .alias-pre{padding:9px 10px;font-size:12px;color:#0F6E56;background:#E1F5EE;white-space:nowrap;border-right:1px solid #9FE1CB}
+  .alias-pre{padding:10px;font-size:12px;color:#0F6E56;background:#E1F5EE;white-space:nowrap;border-right:1px solid #9FE1CB}
   .alias-wrap input{border:none;border-radius:0;outline:none;padding-left:8px;margin:0;flex:1}
-  .hint{font-size:11px;color:#aaa;margin-bottom:12px}
-  .btn{border:none;border-radius:10px;font-weight:500;cursor:pointer;font-size:13px;padding:11px 20px;transition:all .15s;width:100%}
+  .hint{font-size:11px;color:#9a9a9a;margin-bottom:12px;line-height:1.4}
+  .btn{border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px;padding:11px 20px;transition:all .15s;width:100%}
+  .btn:disabled{opacity:.65;cursor:not-allowed}
   .btn-primary{background:#1D9E75;color:#fff}
   .btn-primary:hover{background:#0F6E56}
-  .btn-ghost{background:#E1F5EE;color:#085041;border:1px solid #9FE1CB;padding:6px 12px;width:auto}
-  .btn-danger{background:transparent;color:#A32D2D;border:1px solid #F09595;padding:6px 12px;width:auto}
-  .error{background:#FCEBEB;border:1px solid #F09595;border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#791F1F;display:none}
-  .success-box{background:#E1F5EE;border:1px solid #5DCAA5;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:none}
+  .btn-ghost{background:#E1F5EE;color:#085041;border:1px solid #9FE1CB;padding:7px 12px;width:auto}
+  .btn-soft{background:#f4f4f4;color:#444;border:1px solid #ddd}
+  .btn-danger{background:transparent;color:#A32D2D;border:1px solid #F09595;padding:7px 12px;width:auto}
+  .message{border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;display:none;line-height:1.45}
+  .error{background:#FCEBEB;border:1px solid #F09595;color:#791F1F}
+  .success{background:#E1F5EE;border:1px solid #5DCAA5;color:#0F6E56}
   .link-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
   .link-info{flex:1;min-width:0}
-  .link-short{font-size:14px;font-weight:500;color:#0F6E56}
-  .link-url{font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .link-short{font-size:14px;font-weight:700;color:#0F6E56}
+  .link-url{font-size:11px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
   .qr-colors{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
   .color-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent}
   .color-dot.active{border-color:#1D9E75;box-shadow:0 0 0 1px #1D9E75}
   .qr-styles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
-  .style-btn{padding:6px 8px;border-radius:9px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:11px;cursor:pointer}
+  .style-btn{padding:7px 8px;border-radius:9px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:11px;cursor:pointer}
   .style-btn.active{border-color:#1D9E75;background:#E1F5EE;color:#085041}
-  .upload-zone{border:1.5px dashed #5DCAA5;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#E1F5EE;margin-bottom:12px;font-size:11px}
-  .qr-preview-area{text-align:center;margin-top:15px; background: #fafafa; border-radius: 12px; padding: 15px; border: 1px solid #eee;}
-  #qr-container canvas { max-width: 100%; height: auto !important; border-radius: 8px; }
-  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .upload-zone{border:1.5px dashed #5DCAA5;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#E1F5EE;margin-bottom:12px;font-size:11px;color:#0F6E56}
+  .qr-preview-area{text-align:center;margin-top:15px;background:#fafafa;border-radius:12px;padding:15px;border:1px solid #eee}
+  #qr-container canvas{max-width:100%;height:auto!important;border-radius:8px}
+  .auth-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .admin-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+  @media(max-width:680px){.grid,.auth-actions,.admin-row{grid-template-columns:1fr}.header{align-items:flex-start;flex-direction:column}.user-chip{width:100%;justify-content:space-between}.tabs{overflow:auto}.tab{white-space:nowrap}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
-    <div class="header-icon">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+    <div class="brand">
+      <div class="header-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h1>juteach.org</h1>
+        <p>Acortador, QR e invitaciones privadas</p>
+      </div>
     </div>
-    <div>
-      <h1>juteach.org</h1>
-      <p>Profesor · Coach · Tecnología</p>
+    <div class="user-chip" id="user-chip">
+      <span id="user-email"></span>
+      <button class="btn btn-ghost" onclick="signOut()">Salir</button>
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('inicio')">Inicio / Generador</button>
-    <button class="tab" onclick="showTab('enlaces')">Mis enlaces</button>
+  <div id="setup-error" class="message error"></div>
+
+  <div id="auth-view" class="card">
+    <div class="stitle">Acceso por invitación</div>
+    <div id="invite-msg" class="message success"></div>
+    <div id="auth-msg" class="message error"></div>
+
+    <label>Correo</label>
+    <input type="email" id="auth-email" placeholder="tu-correo@ejemplo.com"/>
+    <label>Contraseña</label>
+    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres"/>
+
+    <div class="auth-actions">
+      <button class="btn btn-primary" onclick="signIn()">Ingresar</button>
+      <button class="btn btn-soft" onclick="signUp()">Crear cuenta con invitación</button>
+    </div>
+
+    <p class="hint" style="margin-top:12px">Si recibiste una invitación, abre ese enlace y crea tu cuenta con el mismo correo autorizado.</p>
+    <button class="btn btn-ghost" onclick="resetPassword()">Olvidé mi contraseña</button>
+  </div>
+
+  <div id="recovery-view" class="card" style="display:none">
+    <div class="stitle">Crear nueva contraseña</div>
+    <div id="recovery-msg" class="message error"></div>
+    <label>Nueva contraseña</label>
+    <input type="password" id="new-password" placeholder="Nueva contraseña"/>
+    <button class="btn btn-primary" onclick="updatePassword()">Guardar contraseña</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" onclick="showTab('inicio', this)">Inicio / Generador</button>
+    <button class="tab" onclick="showTab('enlaces', this)">Mis enlaces</button>
+    <button class="tab" onclick="showTab('admin', this)">Admin</button>
   </div>
 
   <div id="tab-inicio" class="section active">
     <div class="grid">
       <div>
         <div class="card">
-          <div class="stitle">1. Acortar Enlace</div>
-          <label>URL Destino</label>
+          <div class="stitle">1. Acortar enlace</div>
+          <label>URL destino</label>
           <input type="text" id="url-input" placeholder="https://youtube.com/watch?..."/>
-          <label>Alias (Slug)</label>
+          <label>Alias</label>
           <div class="alias-wrap">
             <span class="alias-pre">juteach.org/</span>
             <input type="text" id="slug-input" placeholder="mi-clase"/>
           </div>
-          <div class="hint">Ej: /clase-01, /recurso-pdf</div>
-          <div class="error" id="error-msg"></div>
-          
-          <div class="success-box" id="success-box">
-            <div style="font-size:11px; color:#0F6E56; font-weight:600">¡Listo! Enlace creado:</div>
-            <div id="success-link" style="font-size:14px; font-weight:bold; margin:5px 0; color:#085041"></div>
-            <div style="display:flex; gap:5px">
+          <div class="hint">Cada usuario puede tener hasta <span id="limit-text">100</span> enlaces activos. Si borra uno, libera espacio.</div>
+          <div class="message error" id="error-msg"></div>
+          <div class="message success" id="success-box">
+            <div style="font-weight:700">Listo, enlace creado:</div>
+            <div id="success-link" style="font-size:14px;font-weight:800;margin:5px 0;color:#085041"></div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
               <button class="btn btn-ghost" onclick="copyLink()">Copiar</button>
               <button class="btn btn-ghost" onclick="sendToQR()">Usar en QR</button>
             </div>
           </div>
-          <button class="btn btn-primary" id="create-btn" onclick="createLink()">Generar Enlace Corto</button>
+          <button class="btn btn-primary" id="create-btn" onclick="createLink()">Generar enlace corto</button>
         </div>
       </div>
 
@@ -100,7 +143,6 @@
           <div class="stitle">2. Personalizar QR</div>
           <label>Texto o URL del QR</label>
           <input type="text" id="qr-url" placeholder="https://juteach.org/..." oninput="updateQR()"/>
-          
           <label>Estilo de puntos</label>
           <div class="qr-styles">
             <button class="style-btn active" onclick="setQRStyle('square',this)">Cuadrado</button>
@@ -108,19 +150,16 @@
             <button class="style-btn" onclick="setQRStyle('rounded',this)">Redondo</button>
             <button class="style-btn" onclick="setQRStyle('extra-rounded',this)">Diamante</button>
           </div>
-
-          <label>Color Principal</label>
+          <label>Color principal</label>
           <div class="qr-colors" id="qr-colors"></div>
-          
-          <label>Imagen Central (Logo)</label>
+          <label>Imagen central</label>
           <div class="upload-zone" onclick="document.getElementById('qr-img').click()">
-            <span id="img-label">Subir Logo .PNG / .JPG</span>
+            <span id="img-label">Subir logo .PNG / .JPG</span>
           </div>
           <input type="file" id="qr-img" accept="image/*" style="display:none" onchange="loadLogo(this)"/>
-
           <div class="qr-preview-area" id="qr-preview-box" style="display:none">
             <div id="qr-container"></div>
-            <button class="btn btn-primary" style="margin-top:10px" onclick="downloadQR()">Descargar en Alta Resolución</button>
+            <button class="btn btn-primary" style="margin-top:10px" onclick="downloadQR()">Descargar PNG</button>
           </div>
         </div>
       </div>
@@ -128,170 +167,388 @@
   </div>
 
   <div id="tab-enlaces" class="section">
-    <div style="display:flex;justify-content:space-between;margin-bottom:15px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;gap:8px">
       <span id="links-count" style="font-size:13px;color:#666">Cargando...</span>
       <button class="btn btn-ghost" onclick="loadLinks()">Actualizar</button>
     </div>
     <div id="links-list"></div>
   </div>
+
+  <div id="tab-admin" class="section">
+    <div class="card">
+      <div class="stitle">Panel admin</div>
+      <div id="admin-msg" class="message error"></div>
+      <label>Clave admin de Vercel</label>
+      <input type="password" id="admin-password" placeholder="Tu APP_PASSWORD actual"/>
+      <div class="admin-row">
+        <div>
+          <label>Correo autorizado</label>
+          <input type="email" id="invite-email" placeholder="persona@correo.com"/>
+        </div>
+        <button class="btn btn-primary" onclick="createInvite()">Crear invitación</button>
+      </div>
+      <p class="hint">La clave no se guarda en el archivo público. Solo se usa para pedirle al servidor que genere invitaciones.</p>
+      <button class="btn btn-ghost" onclick="loadInvites()">Ver invitaciones</button>
+    </div>
+    <div id="invites-list"></div>
+  </div>
 </div>
 
 <script>
-const PWD = "-Acortador2026";
 const API_URL = "/api";
-const HEADERS = {"Content-Type":"application/json","Authorization":"Bearer "+PWD};
+const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
+const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
 
+let supabaseClient = null;
+let currentSession = null;
 let allLinks = [];
-let currentQRConfig = {
-    color: "#1D9E75",
-    bg: "#ffffff",
-    style: "square",
-    logo: ""
-};
+let siteUrl = "https://juteach.org";
+let currentQRConfig = { color:"#1D9E75", bg:"#ffffff", style:"square", logo:"" };
 
-// 1. INICIALIZAR LIBRERÍA QR
 const qrCode = new QRCodeStyling({
-    width: 300,
-    height: 300,
-    margin: 10,
-    dotsOptions: { color: "#1D9E75", type: "square" },
-    backgroundOptions: { color: "#ffffff" },
-    imageOptions: { crossOrigin: "anonymous", margin: 5, imageSize: 0.4 }
+  width:300,
+  height:300,
+  margin:10,
+  dotsOptions:{ color:"#1D9E75", type:"square" },
+  backgroundOptions:{ color:"#ffffff" },
+  imageOptions:{ crossOrigin:"anonymous", margin:5, imageSize:0.4 }
 });
 
-// 2. COLORES
-const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
-function initUi(){
-    const container = document.getElementById("qr-colors");
-    COLORS.forEach((c, i) => {
-        const d = document.createElement("div");
-        d.className = "color-dot" + (i===0?" active":"");
-        d.style.background = c;
-        d.onclick = () => {
-            document.querySelectorAll(".color-dot").forEach(x=>x.classList.remove("active"));
-            d.classList.add("active");
-            currentQRConfig.color = c;
-            updateQR();
-        };
-        container.appendChild(d);
+function $(id){ return document.getElementById(id); }
+function showMessage(id, text, type="error"){
+  const el = $(id);
+  el.textContent = text;
+  el.className = `message ${type}`;
+  el.style.display = text ? "block" : "none";
+}
+function hideMessage(id){ showMessage(id, "", "error"); }
+function escapeHtml(text=""){
+  return String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+function authHeaders(){
+  return {"Content-Type":"application/json","Authorization":"Bearer "+currentSession.access_token};
+}
+function adminHeaders(){
+  return {"Content-Type":"application/json","Authorization":"Bearer "+$("admin-password").value.trim()};
+}
+
+async function initApp(){
+  initQrColors();
+
+  try{
+    const configRes = await fetch(`${API_URL}?action=config`);
+    const config = await configRes.json();
+    if(!config.supabaseUrl || !config.supabaseAnonKey){
+      showMessage("setup-error", "Falta conectar Supabase en Vercel. Cuando agregues esas llaves, esta pantalla quedará activa.");
+      return;
+    }
+
+    siteUrl = config.siteUrl || siteUrl;
+    $("limit-text").textContent = config.maxLinksPerUser || 100;
+    supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+
+    if(inviteFromUrl){
+      showMessage("invite-msg", "Invitación detectada. Crea tu cuenta o inicia sesión con el correo autorizado.", "success");
+    }
+
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      currentSession = session;
+      renderAuthState();
     });
+
+    const { data } = await supabaseClient.auth.getSession();
+    currentSession = data.session;
+    renderAuthState();
+  }catch(e){
+    showMessage("setup-error", "No pude cargar la configuración. Revisa la conexión o vuelve a intentar.");
+  }
 }
 
-// 3. LÓGICA DE PESTAÑAS
-function showTab(t){
-    document.querySelectorAll(".tab, .section").forEach(el => el.classList.remove("active"));
-    event.currentTarget?.classList?.add("active") || document.querySelector(`[onclick="showTab('${t}')"]`).classList.add("active");
-    document.getElementById("tab-"+t).classList.add("active");
-    if(t==='enlaces') loadLinks();
+async function renderAuthState(){
+  const recoveryMode = window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+  $("recovery-view").style.display = recoveryMode && currentSession ? "block" : "none";
+
+  if(!currentSession){
+    $("auth-view").style.display = "block";
+    $("tabs").style.display = "none";
+    $("user-chip").style.display = "none";
+    document.querySelectorAll(".section").forEach(el => el.style.display = "none");
+    return;
+  }
+
+  $("auth-view").style.display = "none";
+  $("tabs").style.display = "flex";
+  $("user-chip").style.display = "flex";
+  $("user-email").textContent = currentSession.user.email;
+  document.querySelectorAll(".section").forEach(el => el.style.display = "");
+
+  if(inviteFromUrl){
+    await claimInvite();
+  }
+
+  await checkAccess();
 }
 
-// 4. LÓGICA DEL ACORTADOR (API)
+async function checkAccess(){
+  const res = await fetch(`${API_URL}?action=me`, {headers: authHeaders()});
+  const data = await res.json();
+
+  if(!data.invited){
+    showMessage("error-msg", "Tu cuenta existe, pero todavía no tiene permiso. Usa tu enlace de invitación o pídele acceso al administrador.");
+    return;
+  }
+
+  hideMessage("error-msg");
+  loadLinks();
+}
+
+async function signUp(){
+  hideMessage("auth-msg");
+  const email = $("auth-email").value.trim();
+  const password = $("auth-password").value;
+  if(!email || !password) return showMessage("auth-msg", "Escribe correo y contraseña.");
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${siteUrl}/Acortador${inviteFromUrl ? `?invite=${inviteFromUrl}` : ""}` }
+  });
+
+  if(error) return showMessage("auth-msg", error.message);
+  if(!data.session) return showMessage("invite-msg", "Revisa tu correo para confirmar la cuenta. Después vuelve a abrir tu invitación.", "success");
+  currentSession = data.session;
+  await renderAuthState();
+}
+
+async function signIn(){
+  hideMessage("auth-msg");
+  const email = $("auth-email").value.trim();
+  const password = $("auth-password").value;
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error) return showMessage("auth-msg", "No pude ingresar. Revisa correo y contraseña.");
+  currentSession = data.session;
+  await renderAuthState();
+}
+
+async function signOut(){
+  await supabaseClient.auth.signOut();
+  currentSession = null;
+  window.location.href = "/Acortador";
+}
+
+async function resetPassword(){
+  hideMessage("auth-msg");
+  const email = $("auth-email").value.trim();
+  if(!email) return showMessage("auth-msg", "Escribe tu correo y luego toca recuperar contraseña.");
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/Acortador`
+  });
+  if(error) return showMessage("auth-msg", error.message);
+  showMessage("invite-msg", "Te envié un correo para crear una nueva contraseña.", "success");
+}
+
+async function updatePassword(){
+  hideMessage("recovery-msg");
+  const password = $("new-password").value;
+  if(!password) return showMessage("recovery-msg", "Escribe tu nueva contraseña.");
+  const { error } = await supabaseClient.auth.updateUser({ password });
+  if(error) return showMessage("recovery-msg", error.message);
+  showMessage("recovery-msg", "Contraseña actualizada. Ya puedes seguir usando tu cuenta.", "success");
+  setTimeout(() => window.location.href = "/Acortador", 1200);
+}
+
+async function claimInvite(){
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers: authHeaders(),
+    body: JSON.stringify({action:"claim-invite", invite: inviteFromUrl})
+  });
+  const data = await res.json();
+  if(data.error) showMessage("error-msg", data.error);
+}
+
+function showTab(t, btn){
+  document.querySelectorAll(".tab, .section").forEach(el => el.classList.remove("active"));
+  (btn || document.querySelector(`[onclick*="'${t}'"]`)).classList.add("active");
+  $("tab-"+t).classList.add("active");
+  if(t === "enlaces") loadLinks();
+}
+
 async function loadLinks(){
-    const res = await fetch(`${API_URL}?action=list`, {headers: HEADERS});
-    allLinks = await res.json();
-    renderLinks();
+  if(!currentSession) return;
+  const res = await fetch(`${API_URL}?action=list`, {headers: authHeaders()});
+  const data = await res.json();
+  if(data.error) return showMessage("error-msg", data.error);
+  allLinks = data;
+  renderLinks();
 }
 
 function renderLinks(){
-    const list = document.getElementById("links-list");
-    document.getElementById("links-count").textContent = `${allLinks.length} enlaces activos`;
-    list.innerHTML = allLinks.map(lk => `
-        <div class="link-card">
-            <div class="link-info">
-                <div class="link-short">juteach.org/${lk.slug}</div>
-                <div class="link-url">${lk.url}</div>
-            </div>
-            <div style="display:flex; gap:5px">
-                <button class="btn btn-ghost" onclick="useInQR('https://juteach.org/${lk.slug}')">QR</button>
-                <button class="btn btn-danger" onclick="deleteLink('${lk.slug}')">Eliminar</button>
-            </div>
-        </div>
-    `).join("");
+  $("links-count").textContent = `${allLinks.length} enlaces activos`;
+  $("links-list").innerHTML = allLinks.map(lk => `
+    <div class="link-card">
+      <div class="link-info">
+        <div class="link-short">${escapeHtml(siteUrl)}/${escapeHtml(lk.slug)}</div>
+        <div class="link-url">${escapeHtml(lk.url)}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="useInQR('${escapeHtml(siteUrl)}/${escapeHtml(lk.slug)}')">QR</button>
+        <button class="btn btn-danger" onclick="deleteLink('${escapeHtml(lk.slug)}')">Eliminar</button>
+      </div>
+    </div>
+  `).join("") || `<div class="card"><p class="hint">Todavía no tienes enlaces creados.</p></div>`;
 }
 
 async function createLink(){
-    const url = document.getElementById("url-input").value.trim();
-    const slug = document.getElementById("slug-input").value.trim();
-    if(!url || !slug) return alert("Completa los campos");
+  hideMessage("error-msg");
+  const url = $("url-input").value.trim();
+  const slug = $("slug-input").value.trim();
+  if(!url || !slug) return showMessage("error-msg", "Completa la URL y el alias.");
 
-    const btn = document.getElementById("create-btn");
-    btn.disabled = true; btn.textContent = "Procesando...";
+  const btn = $("create-btn");
+  btn.disabled = true;
+  btn.textContent = "Procesando...";
 
-    try {
-        const res = await fetch(API_URL, {
-            method: "POST",
-            headers: HEADERS,
-            body: JSON.stringify({ action: "create", url, slug })
-        });
-        const data = await res.json();
-        if(data.error) alert(data.error);
-        else {
-            document.getElementById("success-link").textContent = data.short;
-            document.getElementById("success-box").style.display = "block";
-            loadLinks();
-        }
-    } catch (e) { alert("Error de conexión"); }
-    btn.disabled = false; btn.textContent = "Generar Enlace Corto";
-}
-
-async function deleteLink(s){
-    if(!confirm("¿Eliminar este enlace?")) return;
-    await fetch(API_URL, { method: "POST", headers: HEADERS, body: JSON.stringify({ action:"delete", slug:s })});
-    loadLinks();
-}
-
-// 5. LÓGICA DEL QR PRO
-function updateQR(){
-    const val = document.getElementById("qr-url").value.trim();
-    if(!val) return;
-    
-    document.getElementById("qr-preview-box").style.display = "block";
-    const container = document.getElementById("qr-container");
-    container.innerHTML = ""; // Limpiar
-
-    qrCode.update({
-        data: val,
-        dotsOptions: { color: currentQRConfig.color, type: currentQRConfig.style },
-        image: currentQRConfig.logo
+  try{
+    const res = await fetch(API_URL, {
+      method:"POST",
+      headers:authHeaders(),
+      body:JSON.stringify({action:"create", url, slug})
     });
-    qrCode.append(container);
+    const data = await res.json();
+    if(data.error) showMessage("error-msg", data.error);
+    else{
+      $("success-link").textContent = data.short;
+      $("success-box").style.display = "block";
+      $("url-input").value = "";
+      $("slug-input").value = "";
+      loadLinks();
+    }
+  }catch(e){
+    showMessage("error-msg", "Error de conexión.");
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Generar enlace corto";
+}
+
+async function deleteLink(slug){
+  if(!confirm("¿Eliminar este enlace?")) return;
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:authHeaders(),
+    body:JSON.stringify({action:"delete", slug})
+  });
+  const data = await res.json();
+  if(data.error) return alert(data.error);
+  loadLinks();
+}
+
+async function createInvite(){
+  showMessage("admin-msg", "", "error");
+  const email = $("invite-email").value.trim();
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:adminHeaders(),
+    body:JSON.stringify({action:"admin-create-invite", email})
+  });
+  const data = await res.json();
+  if(data.error) return showMessage("admin-msg", data.error);
+  showMessage("admin-msg", `Invitación creada para ${data.email}. Copia este enlace: ${data.invite}`, "success");
+  $("invite-email").value = "";
+  loadInvites();
+}
+
+async function loadInvites(){
+  const res = await fetch(`${API_URL}?action=admin-invites`, {headers:adminHeaders()});
+  const data = await res.json();
+  if(data.error) return showMessage("admin-msg", data.error);
+  $("invites-list").innerHTML = data.map(inv => `
+    <div class="link-card">
+      <div class="link-info">
+        <div class="link-short">${escapeHtml(inv.email)}</div>
+        <div class="link-url">${inv.claimed_at ? "Usada" : escapeHtml(inv.invite)}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="copyText('${escapeHtml(inv.invite)}')">Copiar</button>
+        <button class="btn btn-danger" onclick="deleteInvite('${escapeHtml(inv.id)}')">Eliminar</button>
+      </div>
+    </div>
+  `).join("") || `<div class="card"><p class="hint">No hay invitaciones todavía.</p></div>`;
+}
+
+async function deleteInvite(id){
+  if(!confirm("¿Eliminar esta invitación?")) return;
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:adminHeaders(),
+    body:JSON.stringify({action:"admin-delete-invite", id})
+  });
+  const data = await res.json();
+  if(data.error) return showMessage("admin-msg", data.error);
+  loadInvites();
+}
+
+function initQrColors(){
+  const container = $("qr-colors");
+  COLORS.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "color-dot" + (i === 0 ? " active" : "");
+    d.style.background = c;
+    d.onclick = () => {
+      document.querySelectorAll(".color-dot").forEach(x => x.classList.remove("active"));
+      d.classList.add("active");
+      currentQRConfig.color = c;
+      updateQR();
+    };
+    container.appendChild(d);
+  });
+}
+
+function updateQR(){
+  const val = $("qr-url").value.trim();
+  if(!val) return;
+  $("qr-preview-box").style.display = "block";
+  $("qr-container").innerHTML = "";
+  qrCode.update({
+    data: val,
+    dotsOptions: { color: currentQRConfig.color, type: currentQRConfig.style },
+    image: currentQRConfig.logo
+  });
+  qrCode.append($("qr-container"));
 }
 
 function setQRStyle(s, btn){
-    document.querySelectorAll(".style-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentQRConfig.style = s;
-    updateQR();
+  document.querySelectorAll(".style-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentQRConfig.style = s;
+  updateQR();
 }
 
 function loadLogo(input){
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = e => {
-        currentQRConfig.logo = e.target.result;
-        document.getElementById("img-label").textContent = "Logo cargado ✓";
-        updateQR();
-    };
-    reader.readAsDataURL(file);
-}
-
-function downloadQR(){
-    qrCode.download({ name: "qr-juteach", extension: "png" });
-}
-
-// Helpers
-function copyLink(){ navigator.clipboard.writeText(document.getElementById("success-link").textContent); alert("Copiado!"); }
-function sendToQR(){ useInQR(document.getElementById("success-link").textContent); }
-function useInQR(url){ 
-    document.getElementById("qr-url").value = url; 
-    showTab('inicio'); 
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentQRConfig.logo = e.target.result;
+    $("img-label").textContent = "Logo cargado ✓";
     updateQR();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  reader.readAsDataURL(file);
 }
 
-// Inicio
-initUi();
-loadLinks();
+function downloadQR(){ qrCode.download({ name:"qr-juteach", extension:"png" }); }
+function copyText(text){ navigator.clipboard.writeText(text); alert("Copiado"); }
+function copyLink(){ copyText($("success-link").textContent); }
+function sendToQR(){ useInQR($("success-link").textContent); }
+function useInQR(url){
+  $("qr-url").value = url;
+  showTab("inicio");
+  updateQR();
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+
+initApp();
 </script>
 </body>
 </html>
