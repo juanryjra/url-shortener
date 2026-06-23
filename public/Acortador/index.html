@@ -27,6 +27,31 @@
   label{font-size:12px;color:#666;display:block;margin-bottom:5px}
   input[type=text],input[type=email],input[type=password],input[type=number],select{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;margin-bottom:12px;outline:none;background:#fff}
   input:focus{border-color:#1D9E75}
+  .pass-wrap{position:relative;margin-bottom:12px}
+  .pass-wrap input{margin-bottom:0;padding-right:40px;width:100%}
+  .pass-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#999;padding:0;display:flex;align-items:center}
+  .pass-toggle:hover{color:#1D9E75}
+  .strength-bar{height:4px;border-radius:4px;margin-bottom:8px;background:#eee;overflow:hidden;transition:all .3s}
+  .strength-fill{height:100%;border-radius:4px;transition:all .3s;width:0}
+  .strength-fill.s1{width:25%;background:#E24B4A}
+  .strength-fill.s2{width:50%;background:#f5a623}
+  .strength-fill.s3{width:75%;background:#5DCAA5}
+  .strength-fill.s4{width:100%;background:#1D9E75}
+  .reqs{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-bottom:10px}
+  .req{font-size:11px;color:#aaa;display:flex;align-items:center;gap:4px}
+  .req.ok{color:#0F6E56}
+  .req svg{flex-shrink:0}
+  /* Modal T&C */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem}
+  .modal{background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
+  .modal-header{padding:1.2rem 1.5rem;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+  .modal-header h2{font-size:15px;font-weight:700;color:#085041}
+  .modal-body{overflow-y:auto;padding:1.2rem 1.5rem;font-size:12px;line-height:1.7;color:#444}
+  .modal-body h3{font-size:13px;font-weight:700;color:#085041;margin:14px 0 6px}
+  .modal-body p{margin-bottom:8px}
+  .modal-footer{padding:1rem 1.5rem;border-top:1px solid #eee;display:flex;flex-direction:column;gap:10px}
+  .tc-check{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#444;cursor:pointer}
+  .tc-check input{margin-top:2px;accent-color:#1D9E75;flex-shrink:0}
   .alias-wrap{display:flex;border:1.5px solid #5DCAA5;border-radius:10px;overflow:hidden;margin-bottom:4px}
   .alias-pre{padding:10px;font-size:12px;color:#0F6E56;background:#E1F5EE;white-space:nowrap;border-right:1px solid #9FE1CB}
   .alias-wrap input{border:none;border-radius:0;outline:none;padding-left:8px;margin:0;flex:1}
@@ -87,22 +112,97 @@
     <label>Correo</label>
     <input type="email" id="auth-email" placeholder="tu-correo@ejemplo.com"/>
     <label>Contraseña</label>
-    <input type="password" id="auth-password" placeholder="Mínimo 6 caracteres"/>
+    <div class="pass-wrap">
+      <input type="password" id="auth-password" placeholder="Mínimo 8 caracteres" oninput="onPasswordInput(this)"/>
+      <button type="button" class="pass-toggle" onclick="togglePass('auth-password',this)" title="Mostrar/ocultar contraseña">
+        <svg id="eye-auth-password" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <!-- Indicador de fortaleza (solo visible al registrarse) -->
+    <div id="strength-section" style="display:none">
+      <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+      <div class="reqs" id="reqs-list">
+        <span class="req" id="req-len"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Mínimo 8 caracteres</span>
+        <span class="req" id="req-upper"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Una mayúscula</span>
+        <span class="req" id="req-num"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Un número</span>
+        <span class="req" id="req-sym"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Un símbolo (!@#...)</span>
+      </div>
+    </div>
 
     <div class="auth-actions">
       <button class="btn btn-primary" onclick="signIn()">Ingresar</button>
-      <button class="btn btn-soft" onclick="signUp()">Crear cuenta con invitación</button>
+      <button class="btn btn-soft" onclick="openSignUp()">Crear cuenta con invitación</button>
     </div>
 
     <p class="hint" style="margin-top:12px">Si recibiste una invitación, abre ese enlace y crea tu cuenta con el mismo correo autorizado.</p>
     <button class="btn btn-ghost" onclick="resetPassword()">Olvidé mi contraseña</button>
   </div>
 
+  <!-- Modal Términos y Condiciones -->
+  <div class="modal-overlay" id="tc-modal" style="display:none" onclick="closeTCModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Términos y Condiciones de uso</h2>
+        <button class="pass-toggle" onclick="document.getElementById('tc-modal').style.display='none'" style="position:static;transform:none;color:#666">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Bienvenido/a a <strong>juteach.org</strong>. Al crear una cuenta y usar este servicio, aceptas las condiciones descritas a continuación. Léelas con cuidado antes de continuar.</p>
+
+        <h3>1. Descripción del servicio</h3>
+        <p>juteach.org ofrece un servicio de acortamiento de enlaces y generación de códigos QR de uso <strong>educativo y profesional</strong>. El acceso es privado y solo mediante invitación autorizada por el administrador.</p>
+
+        <h3>2. Acceso por invitación</h3>
+        <p>El registro requiere una invitación válida enviada al correo del usuario. La invitación es personal e intransferible. Compartirla con terceros puede resultar en la suspensión de la cuenta.</p>
+
+        <h3>3. Uso permitido</h3>
+        <p>Los enlaces creados deben dirigir a contenido legal, educativo o profesional. Está expresamente prohibido usar el servicio para:</p>
+        <p>• Distribuir spam, publicidad no autorizada o contenido engañoso.<br>
+        • Enlazar a sitios con malware, phishing o contenido ilegal.<br>
+        • Suplantar identidades o marcas registradas.<br>
+        • Cualquier actividad que viole las leyes de la República de Colombia.</p>
+
+        <h3>4. Límites del servicio</h3>
+        <p>Cada usuario puede mantener hasta <strong>100 enlaces activos</strong>. Para crear nuevos, debe eliminar los que ya no necesite. El administrador puede ajustar este límite en cualquier momento.</p>
+
+        <h3>5. Privacidad y datos</h3>
+        <p>Al registrarte, almacenamos tu correo electrónico y los enlaces que crees. Esta información se usa exclusivamente para operar el servicio. No se vende ni se comparte con terceros. Los datos se gestionan a través de Supabase bajo sus políticas de privacidad.</p>
+
+        <h3>6. Seguridad de la cuenta</h3>
+        <p>Eres responsable de mantener tu contraseña segura. Se recomienda una contraseña con al menos 8 caracteres, incluyendo mayúsculas, números y símbolos. En caso de pérdida, puedes recuperarla por correo.</p>
+
+        <h3>7. Suspensión y cancelación</h3>
+        <p>El administrador de juteach.org se reserva el derecho de suspender o eliminar cuentas que incumplan estos términos, sin previo aviso y sin necesidad de justificación adicional.</p>
+
+        <h3>8. Cambios en los términos</h3>
+        <p>Estos términos pueden actualizarse en cualquier momento. Se notificará a los usuarios cuando existan cambios importantes. El uso continuado del servicio implica la aceptación de los nuevos términos.</p>
+
+        <h3>9. Jurisdicción</h3>
+        <p>Este servicio opera desde <strong>Bogotá, Colombia</strong>. Cualquier controversia se resolverá bajo las leyes colombianas vigentes.</p>
+
+        <p style="margin-top:14px;color:#888">Última actualización: junio de 2026.</p>
+      </div>
+      <div class="modal-footer">
+        <label class="tc-check">
+          <input type="checkbox" id="tc-checkbox" onchange="document.getElementById('btn-signup-confirm').disabled=!this.checked"/>
+          He leído y acepto los Términos y Condiciones de uso de juteach.org
+        </label>
+        <button class="btn btn-primary" id="btn-signup-confirm" onclick="signUp()" disabled>Crear mi cuenta</button>
+      </div>
+    </div>
+  </div>
+
   <div id="recovery-view" class="card" style="display:none">
     <div class="stitle">Crear nueva contraseña</div>
     <div id="recovery-msg" class="message error"></div>
     <label>Nueva contraseña</label>
-    <input type="password" id="new-password" placeholder="Nueva contraseña"/>
+    <div class="pass-wrap">
+      <input type="password" id="new-password" placeholder="Nueva contraseña segura"/>
+      <button type="button" class="pass-toggle" onclick="togglePass('new-password',this)" title="Mostrar/ocultar contraseña">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
     <button class="btn btn-primary" onclick="updatePassword()">Guardar contraseña</button>
   </div>
 
@@ -199,6 +299,66 @@ const API_URL = "/api";
 const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
 const ADMIN_EMAIL = "profejuanry@gmail.com";
 const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
+
+/* ── Mostrar / ocultar contraseña ── */
+function togglePass(inputId, btn) {
+  const input = $(inputId);
+  const isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.innerHTML = isHidden
+    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+}
+
+/* ── Validación de fortaleza ── */
+function checkStrength(pw) {
+  return {
+    len:   pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    num:   /[0-9]/.test(pw),
+    sym:   /[^A-Za-z0-9]/.test(pw),
+  };
+}
+
+function onPasswordInput(input) {
+  const isSignUp = $("strength-section") && $("strength-section").style.display !== "none";
+  if (!isSignUp) return;
+  const pw = input.value;
+  const r = checkStrength(pw);
+  const score = [r.len, r.upper, r.num, r.sym].filter(Boolean).length;
+  const fill = $("strength-fill");
+  fill.className = "strength-fill" + (score ? ` s${score}` : "");
+  const mark = (id, ok) => {
+    const el = $(id);
+    el.classList.toggle("ok", ok);
+    el.querySelector("svg").style.stroke = ok ? "#1D9E75" : "#ccc";
+  };
+  mark("req-len",   r.len);
+  mark("req-upper", r.upper);
+  mark("req-num",   r.num);
+  mark("req-sym",   r.sym);
+}
+
+function isPasswordStrong(pw) {
+  const r = checkStrength(pw);
+  return r.len && r.upper && r.num && r.sym;
+}
+
+/* ── Modal Términos y Condiciones ── */
+function openSignUp() {
+  hideMessage("auth-msg");
+  // Mostrar indicador de fortaleza
+  $("strength-section").style.display = "block";
+  onPasswordInput($("auth-password"));
+  // Resetear checkbox y abrir modal
+  $("tc-checkbox").checked = false;
+  $("btn-signup-confirm").disabled = true;
+  $("tc-modal").style.display = "flex";
+}
+
+function closeTCModal(event) {
+  if (event.target === $("tc-modal")) $("tc-modal").style.display = "none";
+}
 
 let supabaseClient = null;
 let currentSession = null;
@@ -312,10 +472,12 @@ async function checkAccess(){
 }
 
 async function signUp(){
+  $("tc-modal").style.display = "none";
   hideMessage("auth-msg");
   const email = $("auth-email").value.trim();
   const password = $("auth-password").value;
   if(!email || !password) return showMessage("auth-msg", "Escribe correo y contraseña.");
+  if(!isPasswordStrong(password)) return showMessage("auth-msg", "La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
 
   const { data, error } = await supabaseClient.auth.signUp({
     email,

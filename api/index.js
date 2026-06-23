@@ -22,6 +22,19 @@ const supabase =
       })
     : null
 
+/* ── Rate limiting: máx intentos por IP en ventana de tiempo ── */
+async function checkRateLimit(req, res, key, maxRequests = 20, windowSecs = 60) {
+  const ip = (req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim()
+  const rateKey = `rl:${key}:${ip}`
+  const count = await redis.incr(rateKey)
+  if (count === 1) await redis.expire(rateKey, windowSecs)
+  if (count > maxRequests) {
+    res.status(429).json({ error: `Demasiados intentos. Espera ${windowSecs} segundos antes de intentar de nuevo.` })
+    return false
+  }
+  return true
+}
+
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -319,6 +332,7 @@ export default async function handler(req, res) {
   if (!requireSupabase(res)) return
 
   if (action === 'admin-invites') {
+    if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
     if (!await isAdmin(req, res)) return
     return listInvites(res)
   }
@@ -326,11 +340,13 @@ export default async function handler(req, res) {
   const body = await readBody(req)
 
   if (req.method === 'POST' && body.action === 'admin-create-invite') {
+    if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
     if (!await isAdmin(req, res)) return
     return createInvite(body, res)
   }
 
   if (req.method === 'POST' && body.action === 'admin-delete-invite') {
+    if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
     if (!await isAdmin(req, res)) return
     return deleteInvite(body, res)
   }
@@ -352,7 +368,10 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET' && action === 'list') return listLinks(user, res)
 
-  if (req.method === 'POST' && body.action === 'create') return createLink(user, body, res)
+  if (req.method === 'POST' && body.action === 'create') {
+    if (!await checkRateLimit(req, res, 'create', 30, 60)) return
+    return createLink(user, body, res)
+  }
   if (req.method === 'POST' && body.action === 'delete') return deleteLink(user, body, res)
 
   return res.status(400).json({ error: 'Petición no válida' })
