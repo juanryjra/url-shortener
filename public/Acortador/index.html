@@ -435,7 +435,7 @@ const API_URL = "/api";
 const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
 const ADMIN_EMAIL = "profejuanry@gmail.com";
 const urlParams = new URLSearchParams(window.location.search);
-const inviteFromUrl = urlParams.get("invite");
+let inviteFromUrl = urlParams.get("invite");
 const actionMode = urlParams.get("mode");
 const oobCode = urlParams.get("oobCode");
 
@@ -589,6 +589,7 @@ async function initApp(){
       }catch(e){
         pendingAuthMessage={id:"login-msg",text:"Ese enlace de verificación ya no es válido. Inicia sesión y pide uno nuevo si lo necesitas.",type:"error"};
       }
+      inviteFromUrl=null;
       window.history.replaceState({},"","/Acortador");
     }
 
