@@ -400,13 +400,6 @@
         </button>
       </div>
 
-      <label>Clave admin (APP_PASSWORD de Vercel)</label>
-      <div class="pass-wrap">
-        <input type="password" id="admin-password" placeholder="Tu clave de administrador"/>
-        <button type="button" class="pass-toggle" onclick="togglePass('admin-password',this)" title="Mostrar clave">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
       <div class="admin-row">
         <div>
           <label>Correo del nuevo usuario</label>
@@ -414,7 +407,6 @@
         </div>
         <button class="btn btn-primary" onclick="createInvite()">Crear invitación</button>
       </div>
-      <p class="hint">La clave nunca se guarda en el código. Solo se envía al servidor en cada acción.</p>
       <button class="btn btn-ghost" onclick="loadInvites()">Ver todas las invitaciones</button>
     </div>
     <div id="invites-list"></div>
@@ -467,10 +459,6 @@ function escapeHtml(text=""){
 async function authHeaders(){
   const token=await currentUser.getIdToken();
   return {"Content-Type":"application/json","Authorization":"Bearer "+token};
-}
-async function adminHeaders(){
-  const token=await currentUser.getIdToken();
-  return {"Content-Type":"application/json","Authorization":"Bearer "+token,"X-Admin-Key":$("admin-password").value.trim()};
 }
 
 /* ── Toggle mostrar/ocultar contraseña ── */
@@ -823,7 +811,7 @@ async function createInvite(){
   hideMessage("admin-msg");
   $("invite-result").style.display="none";
   const email=$("invite-email").value.trim();
-  const res=await fetch(API_URL,{method:"POST",headers:await adminHeaders(),body:JSON.stringify({action:"admin-create-invite",email})});
+  const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"admin-create-invite",email})});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   // Mostrar resultado con botón copiar
@@ -834,7 +822,7 @@ async function createInvite(){
   loadInvites();
 }
 async function loadInvites(){
-  const res=await fetch(`${API_URL}?action=admin-invites`,{headers:await adminHeaders()});
+  const res=await fetch(`${API_URL}?action=admin-invites`,{headers:await authHeaders()});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   $("invites-list").innerHTML=data.map(inv=>`
@@ -852,7 +840,7 @@ async function loadInvites(){
 }
 async function deleteInvite(id){
   if(!confirm("¿Eliminar esta invitación?")) return;
-  const res=await fetch(API_URL,{method:"POST",headers:await adminHeaders(),body:JSON.stringify({action:"admin-delete-invite",id})});
+  const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"admin-delete-invite",id})});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   loadInvites();

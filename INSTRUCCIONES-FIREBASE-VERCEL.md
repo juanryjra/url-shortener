@@ -91,21 +91,19 @@ Conserva las que ya tienes:
 ```txt
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
-APP_PASSWORD=...
 ADMIN_EMAIL=...
 ```
 
-Elimina las variables antiguas de Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) si ya no las vas a usar.
+Elimina las variables antiguas de Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) si ya no las vas a usar. `APP_PASSWORD` ya no la usa el código — las acciones de administrador ahora se protegen solo verificando que hayas iniciado sesión con el correo de `ADMIN_EMAIL`, así que también puedes eliminarla.
 
 ## 7. Cómo usarlo como admin
 
 1. Entra a `https://juteach.org/Acortador`.
 2. Inicia sesión con una cuenta tuya (o créala) usando el correo que pusiste en `ADMIN_EMAIL`. Firebase te pedirá confirmar tu correo antes de dejarte entrar.
-3. Abre la pestaña **Admin**.
-4. Escribe tu clave admin actual de Vercel (`APP_PASSWORD`).
-5. Escribe el correo de la persona autorizada.
-6. Toca **Crear invitación**.
-7. Copia el enlace y envíaselo a esa persona.
+3. Abre la pestaña **Admin** (solo aparece para ese correo).
+4. Escribe el correo de la persona autorizada.
+5. Toca **Crear invitación**.
+6. Copia el enlace y envíaselo a esa persona.
 
 La persona abre el enlace, crea su cuenta con ese mismo correo, confirma su correo desde el mensaje que le llega, inicia sesión y ya puede crear sus propios enlaces y QR.
 

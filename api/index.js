@@ -92,30 +92,27 @@ function requireFirebase(res) {
 }
 
 async function isAdmin(req, res) {
-  // Capa 1: APP_PASSWORD en header X-Admin-Key
-  const adminKey = (req.headers['x-admin-key'] || '').trim()
-  if (!process.env.APP_PASSWORD || adminKey !== process.env.APP_PASSWORD) {
-    if (res) res.status(401).json({ error: 'Clave de administrador no válida.' })
+  // El Bearer token debe ser un ID token de Firebase con el correo admin verificado
+  if (!ADMIN_EMAIL) {
+    if (res) res.status(500).json({ error: 'Falta configurar ADMIN_EMAIL en Vercel.' })
     return false
   }
 
-  // Capa 2: el Bearer token debe ser un ID token de Firebase con el correo admin
-  if (ADMIN_EMAIL) {
-    const token = getBearerToken(req)
-    if (!token) {
-      if (res) res.status(401).json({ error: 'Se requiere sesión activa para acciones de admin.' })
+  const token = getBearerToken(req)
+  if (!token) {
+    if (res) res.status(401).json({ error: 'Se requiere sesión activa para acciones de admin.' })
+    return false
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token)
+    if (!decoded.email_verified || (decoded.email || '').toLowerCase() !== ADMIN_EMAIL) {
+      if (res) res.status(403).json({ error: 'No tienes permisos de administrador.' })
       return false
     }
-    try {
-      const decoded = await admin.auth().verifyIdToken(token)
-      if ((decoded.email || '').toLowerCase() !== ADMIN_EMAIL) {
-        if (res) res.status(403).json({ error: 'No tienes permisos de administrador.' })
-        return false
-      }
-    } catch {
-      if (res) res.status(401).json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' })
-      return false
-    }
+  } catch {
+    if (res) res.status(401).json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' })
+    return false
   }
 
   return true
