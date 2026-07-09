@@ -4,7 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>juteach.org — Acortador & QR</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -287,7 +288,7 @@
         <p>Cada usuario puede mantener hasta <strong>100 enlaces activos</strong>. Para crear nuevos, debe eliminar los que ya no necesite. El administrador puede ajustar este límite en cualquier momento sin previo aviso.</p>
 
         <h3>5. Privacidad y protección de datos</h3>
-        <p>Al registrarte, almacenamos tu correo electrónico y los enlaces que crees. Esta información se usa <strong>exclusivamente</strong> para operar el servicio. No se vende, no se comparte con terceros y no se usa con fines publicitarios. Los datos se gestionan a través de Supabase, bajo estrictas políticas de seguridad.</p>
+        <p>Al registrarte, almacenamos tu correo electrónico y los enlaces que crees. Esta información se usa <strong>exclusivamente</strong> para operar el servicio. No se vende, no se comparte con terceros y no se usa con fines publicitarios. Los datos se gestionan a través de Firebase (Google Cloud), bajo estrictas políticas de seguridad.</p>
 
         <h3>6. Cookies</h3>
         <p>Este sitio usa cookies técnicas estrictamente necesarias para gestionar tu sesión de usuario. No utilizamos cookies publicitarias ni de seguimiento de terceros.</p>
@@ -433,10 +434,14 @@
 const API_URL = "/api";
 const COLORS = ["#1D9E75","#085041","#185FA5","#378ADD","#E24B4A","#7F77DD","#000000"];
 const ADMIN_EMAIL = "profejuanry@gmail.com";
-const inviteFromUrl = new URLSearchParams(window.location.search).get("invite");
+const urlParams = new URLSearchParams(window.location.search);
+const inviteFromUrl = urlParams.get("invite");
+const actionMode = urlParams.get("mode");
+const oobCode = urlParams.get("oobCode");
 
-let supabaseClient = null;
-let currentSession = null;
+let firebaseAuth = null;
+let currentUser = null;
+let pendingAuthMessage = null;
 let allLinks = [];
 let siteUrl = "https://juteach.org";
 let currentQRConfig = { color:"#1D9E75", bg:"#ffffff", style:"square", logo:"" };
@@ -459,11 +464,13 @@ function hideMessage(id){ showMessage(id,"","error"); }
 function escapeHtml(text=""){
   return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 }
-function authHeaders(){
-  return {"Content-Type":"application/json","Authorization":"Bearer "+currentSession.access_token};
+async function authHeaders(){
+  const token=await currentUser.getIdToken();
+  return {"Content-Type":"application/json","Authorization":"Bearer "+token};
 }
-function adminHeaders(){
-  return {"Content-Type":"application/json","Authorization":"Bearer "+currentSession.access_token,"X-Admin-Key":$("admin-password").value.trim()};
+async function adminHeaders(){
+  const token=await currentUser.getIdToken();
+  return {"Content-Type":"application/json","Authorization":"Bearer "+token,"X-Admin-Key":$("admin-password").value.trim()};
 }
 
 /* ── Toggle mostrar/ocultar contraseña ── */
@@ -546,11 +553,9 @@ function showForgotPassword(){
   hideMessage("login-msg");
   const email=$("login-email").value.trim();
   if(!email) return showMessage("login-msg","Escribe primero tu correo y luego toca este botón.");
-  supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/Acortador`})
-    .then(({error})=>{
-      if(error) showMessage("login-msg",error.message);
-      else showMessage("login-msg","Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.","success");
-    });
+  firebaseAuth.sendPasswordResetEmail(email,{url:`${siteUrl}/Acortador`})
+    .then(()=>showMessage("login-msg","Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.","success"))
+    .catch(()=>showMessage("login-msg","No pude enviar el correo. Verifica que la dirección sea correcta."));
 }
 
 /* ── App principal ── */
@@ -561,29 +566,40 @@ async function initApp(){
   try{
     const configRes=await fetch(`${API_URL}?action=config`);
     const config=await configRes.json();
-    if(!config.supabaseUrl||!config.supabaseAnonKey){
-      showMessage("setup-error","Falta conectar Supabase en Vercel. Cuando agregues las llaves, esta pantalla quedará activa.");
+    if(!config.firebaseApiKey||!config.firebaseProjectId){
+      showMessage("setup-error","Falta conectar Firebase en Vercel. Cuando agregues las llaves, esta pantalla quedará activa.");
       return;
     }
     siteUrl=config.siteUrl||siteUrl;
     $("limit-text").textContent=config.maxLinksPerUser||100;
-    supabaseClient=supabase.createClient(config.supabaseUrl,config.supabaseAnonKey);
+    firebase.initializeApp({
+      apiKey:config.firebaseApiKey,
+      authDomain:config.firebaseAuthDomain,
+      projectId:config.firebaseProjectId,
+      appId:config.firebaseAppId,
+    });
+    firebaseAuth=firebase.auth();
 
-    supabaseClient.auth.onAuthStateChange((event,session)=>{
-      currentSession=session;
-      if(event==="PASSWORD_RECOVERY"){
-        isRecoveryMode=true;
-        showRecoveryView();
-      } else if(event==="USER_UPDATED" && isRecoveryMode){
-        // Contraseña actualizada — ir al login
-        isRecoveryMode=false;
-      } else {
-        renderAuthState();
+    if(actionMode==="resetPassword" && oobCode){
+      isRecoveryMode=true;
+    } else if(actionMode==="verifyEmail" && oobCode){
+      try{
+        await firebaseAuth.applyActionCode(oobCode);
+        pendingAuthMessage={id:"login-msg",text:"¡Correo verificado! Ya puedes iniciar sesión.",type:"success"};
+      }catch(e){
+        pendingAuthMessage={id:"login-msg",text:"Ese enlace de verificación ya no es válido. Inicia sesión y pide uno nuevo si lo necesitas.",type:"error"};
+      }
+      window.history.replaceState({},"","/Acortador");
+    }
+
+    firebaseAuth.onAuthStateChanged((user)=>{
+      currentUser=user;
+      renderAuthState();
+      if(pendingAuthMessage){
+        showMessage(pendingAuthMessage.id,pendingAuthMessage.text,pendingAuthMessage.type);
+        pendingAuthMessage=null;
       }
     });
-    const {data}=await supabaseClient.auth.getSession();
-    currentSession=data.session;
-    renderAuthState();
   }catch(e){
     showMessage("setup-error","No pude cargar la configuración. Revisa tu conexión e intenta de nuevo.");
   }
@@ -606,7 +622,13 @@ async function renderAuthState(){
   if(isRecoveryMode){ showRecoveryView(); return; }
   $("recovery-view").style.display="none";
 
-  if(!currentSession){
+  if(currentUser && !currentUser.emailVerified){
+    await firebaseAuth.signOut();
+    currentUser=null;
+    showMessage("login-msg","Verifica tu correo antes de iniciar sesión. Revisa tu bandeja de entrada (o spam).");
+  }
+
+  if(!currentUser){
     // Sin sesión: mostrar login o registro según si hay invite
     if(inviteFromUrl){
       $("login-view").style.display="none";
@@ -626,11 +648,11 @@ async function renderAuthState(){
   $("register-view").style.display="none";
   $("tabs").style.display="flex";
   $("user-chip").style.display="flex";
-  $("user-email").textContent=currentSession.user.email;
+  $("user-email").textContent=currentUser.email;
   document.querySelectorAll(".section").forEach(el=>el.style.display="");
 
   // Pestaña admin solo para el administrador
-  const isAdmin=currentSession.user.email.toLowerCase()===ADMIN_EMAIL.toLowerCase();
+  const isAdmin=currentUser.email.toLowerCase()===ADMIN_EMAIL.toLowerCase();
   $("tab-btn-admin").style.display=isAdmin?"":"none";
 
   if(inviteFromUrl) await claimInvite();
@@ -638,7 +660,7 @@ async function renderAuthState(){
 }
 
 async function checkAccess(){
-  const res=await fetch(`${API_URL}?action=me`,{headers:authHeaders()});
+  const res=await fetch(`${API_URL}?action=me`,{headers:await authHeaders()});
   const data=await res.json();
   if(!data.invited){
     showMessage("error-msg","Tu cuenta existe, pero todavía no tiene permiso. Usa tu enlace de invitación o pídele acceso al administrador.");
@@ -654,9 +676,12 @@ async function signIn(){
   const email=$("login-email").value.trim();
   const password=$("login-password").value;
   if(!email||!password) return showMessage("login-msg","Escribe tu correo y contraseña.");
-  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
-  if(error) return showMessage("login-msg","No pude ingresar. Revisa tu correo y contraseña.");
-  currentSession=data.session;
+  try{
+    const cred=await firebaseAuth.signInWithEmailAndPassword(email,password);
+    currentUser=cred.user;
+  }catch(e){
+    return showMessage("login-msg","No pude ingresar. Revisa tu correo y contraseña.");
+  }
   await renderAuthState();
 }
 
@@ -669,26 +694,29 @@ async function signUp(){
   if(!$("tc-checkbox").checked) return showMessage("reg-msg","Debes aceptar los Términos y Condiciones para continuar.");
 
   const btn=$("btn-signup"); btn.disabled=true; btn.textContent="Creando cuenta...";
-  const {data,error}=await supabaseClient.auth.signUp({
-    email, password,
-    options:{emailRedirectTo:`${siteUrl}/Acortador${inviteFromUrl?`?invite=${inviteFromUrl}`:""}`}
-  });
+  try{
+    const cred=await firebaseAuth.createUserWithEmailAndPassword(email,password);
+    await cred.user.sendEmailVerification({
+      url:`${siteUrl}/Acortador${inviteFromUrl?`?invite=${inviteFromUrl}`:""}`
+    });
+    await firebaseAuth.signOut();
+  }catch(e){
+    btn.disabled=false; btn.textContent="Crear mi cuenta";
+    const message=e.code==="auth/email-already-in-use"
+      ? "Ese correo ya tiene una cuenta. Inicia sesión en vez de registrarte."
+      : "No pude crear la cuenta. Intenta de nuevo.";
+    return showMessage("reg-msg",message);
+  }
   btn.disabled=false; btn.textContent="Crear mi cuenta";
 
-  if(error) return showMessage("reg-msg",error.message);
-  if(!data.session){
-    // Mostrar modal de confirmación de correo
-    $("signup-email-shown").textContent=email;
-    $("signup-success-modal").style.display="flex";
-    return;
-  }
-  currentSession=data.session;
-  await renderAuthState();
+  // Mostrar modal de confirmación de correo
+  $("signup-email-shown").textContent=email;
+  $("signup-success-modal").style.display="flex";
 }
 
 async function signOut(){
-  await supabaseClient.auth.signOut();
-  currentSession=null;
+  await firebaseAuth.signOut();
+  currentUser=null;
   window.location.href="/Acortador";
 }
 
@@ -715,14 +743,17 @@ async function updatePassword(){
   if(!password) return showMessage("recovery-msg","Escribe tu nueva contraseña.");
   if(!isPasswordStrong(password)) return showMessage("recovery-msg","La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un símbolo.");
   if(password!==confirm) return showMessage("recovery-msg","Las contraseñas no coinciden. Verifica que sean iguales.");
-  const {error}=await supabaseClient.auth.updateUser({password});
-  if(error) return showMessage("recovery-msg",error.message);
+  try{
+    await firebaseAuth.confirmPasswordReset(oobCode,password);
+  }catch(e){
+    return showMessage("recovery-msg","No pude actualizar tu contraseña. El enlace pudo haber expirado, pide uno nuevo.");
+  }
   showMessage("recovery-msg","¡Contraseña actualizada correctamente! Redirigiendo al inicio de sesión...","success");
   setTimeout(()=>window.location.href="/Acortador",2000);
 }
 
 async function claimInvite(){
-  const res=await fetch(API_URL,{method:"POST",headers:authHeaders(),body:JSON.stringify({action:"claim-invite",invite:inviteFromUrl})});
+  const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"claim-invite",invite:inviteFromUrl})});
   const data=await res.json();
   if(data.error) showMessage("error-msg",data.error);
 }
@@ -737,8 +768,8 @@ function showTab(t,btn){
 
 /* ── Mis enlaces ── */
 async function loadLinks(){
-  if(!currentSession) return;
-  const res=await fetch(`${API_URL}?action=list`,{headers:authHeaders()});
+  if(!currentUser) return;
+  const res=await fetch(`${API_URL}?action=list`,{headers:await authHeaders()});
   const data=await res.json();
   if(data.error) return showMessage("error-msg",data.error);
   allLinks=data; renderLinks();
@@ -766,7 +797,7 @@ async function createLink(){
   if(!url||!slug) return showMessage("error-msg","Completa la URL y el alias.");
   const btn=$("create-btn"); btn.disabled=true; btn.textContent="Procesando...";
   try{
-    const res=await fetch(API_URL,{method:"POST",headers:authHeaders(),body:JSON.stringify({action:"create",url,slug})});
+    const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"create",url,slug})});
     const data=await res.json();
     if(data.error) showMessage("error-msg",data.error);
     else{
@@ -780,7 +811,7 @@ async function createLink(){
 }
 async function deleteLink(slug){
   if(!confirm("¿Eliminar este enlace?")) return;
-  const res=await fetch(API_URL,{method:"POST",headers:authHeaders(),body:JSON.stringify({action:"delete",slug})});
+  const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"delete",slug})});
   const data=await res.json();
   if(data.error) return alert(data.error);
   loadLinks();
@@ -791,7 +822,7 @@ async function createInvite(){
   hideMessage("admin-msg");
   $("invite-result").style.display="none";
   const email=$("invite-email").value.trim();
-  const res=await fetch(API_URL,{method:"POST",headers:adminHeaders(),body:JSON.stringify({action:"admin-create-invite",email})});
+  const res=await fetch(API_URL,{method:"POST",headers:await adminHeaders(),body:JSON.stringify({action:"admin-create-invite",email})});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   // Mostrar resultado con botón copiar
@@ -802,7 +833,7 @@ async function createInvite(){
   loadInvites();
 }
 async function loadInvites(){
-  const res=await fetch(`${API_URL}?action=admin-invites`,{headers:adminHeaders()});
+  const res=await fetch(`${API_URL}?action=admin-invites`,{headers:await adminHeaders()});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   $("invites-list").innerHTML=data.map(inv=>`
@@ -820,7 +851,7 @@ async function loadInvites(){
 }
 async function deleteInvite(id){
   if(!confirm("¿Eliminar esta invitación?")) return;
-  const res=await fetch(API_URL,{method:"POST",headers:adminHeaders(),body:JSON.stringify({action:"admin-delete-invite",id})});
+  const res=await fetch(API_URL,{method:"POST",headers:await adminHeaders(),body:JSON.stringify({action:"admin-delete-invite",id})});
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   loadInvites();

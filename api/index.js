@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { Redis } from '@upstash/redis'
-import { createClient } from '@supabase/supabase-js'
+import admin from 'firebase-admin'
 
 const MAX_LINKS_PER_USER = Number(process.env.MAX_LINKS_PER_USER || 100)
 const SITE_URL = process.env.PUBLIC_SITE_URL || 'https://juteach.org'
@@ -11,16 +11,24 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 })
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const firebaseApiKey = process.env.FIREBASE_API_KEY
+const firebaseAuthDomain = process.env.FIREBASE_AUTH_DOMAIN
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID
+const firebaseAppId = process.env.FIREBASE_APP_ID
 
-const supabase =
-  supabaseUrl && supabaseServiceKey
-    ? createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
-    : null
+let db = null
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+    if (!admin.apps.length) {
+      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) })
+    }
+    db = admin.firestore()
+  } catch {
+    db = null
+  }
+}
 
 /* ── Rate limiting: máx intentos por IP en ventana de tiempo ── */
 async function checkRateLimit(req, res, key, maxRequests = 20, windowSecs = 60) {
@@ -73,6 +81,16 @@ function getBearerToken(req) {
   return auth.slice(7).trim()
 }
 
+function requireFirebase(res) {
+  if (!db) {
+    res.status(500).json({
+      error: 'Falta conectar Firebase. Revisa FIREBASE_SERVICE_ACCOUNT_KEY en Vercel.',
+    })
+    return false
+  }
+  return true
+}
+
 async function isAdmin(req, res) {
   // Capa 1: APP_PASSWORD en header X-Admin-Key
   const adminKey = (req.headers['x-admin-key'] || '').trim()
@@ -81,40 +99,30 @@ async function isAdmin(req, res) {
     return false
   }
 
-  // Capa 2: el Bearer token debe ser un JWT de Supabase con el correo admin
+  // Capa 2: el Bearer token debe ser un ID token de Firebase con el correo admin
   if (ADMIN_EMAIL) {
     const token = getBearerToken(req)
     if (!token) {
       if (res) res.status(401).json({ error: 'Se requiere sesión activa para acciones de admin.' })
       return false
     }
-    const { data, error } = await supabase.auth.getUser(token)
-    if (error || !data?.user) {
+    try {
+      const decoded = await admin.auth().verifyIdToken(token)
+      if ((decoded.email || '').toLowerCase() !== ADMIN_EMAIL) {
+        if (res) res.status(403).json({ error: 'No tienes permisos de administrador.' })
+        return false
+      }
+    } catch {
       if (res) res.status(401).json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' })
       return false
     }
-    if (data.user.email.toLowerCase() !== ADMIN_EMAIL) {
-      if (res) res.status(403).json({ error: 'No tienes permisos de administrador.' })
-      return false
-    }
   }
 
-  return true
-}
-
-function requireSupabase(res) {
-  if (!supabase) {
-    res.status(500).json({
-      error:
-        'Falta conectar Supabase. Revisa SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Vercel.',
-    })
-    return false
-  }
   return true
 }
 
 async function getUser(req, res) {
-  if (!requireSupabase(res)) return null
+  if (!requireFirebase(res)) return null
 
   const token = getBearerToken(req)
   if (!token) {
@@ -122,25 +130,31 @@ async function getUser(req, res) {
     return null
   }
 
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data?.user) {
+  let decoded
+  try {
+    decoded = await admin.auth().verifyIdToken(token)
+  } catch {
     res.status(401).json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' })
     return null
   }
 
-  return data.user
+  if (!decoded.email_verified) {
+    res.status(403).json({ error: 'Verifica tu correo antes de continuar. Revisa tu bandeja de entrada.' })
+    return null
+  }
+
+  return { uid: decoded.uid, email: decoded.email }
+}
+
+function toIso(timestamp) {
+  return timestamp?.toDate?.().toISOString() || null
 }
 
 async function getInviteForUser(user) {
-  const { data, error } = await supabase
-    .from('invites')
-    .select('id,email,claimed_at')
-    .eq('claimed_by', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  if (error) throw error
-  return data
+  const snapshot = await db.collection('invites').where('claimedBy', '==', user.uid).limit(1).get()
+  if (snapshot.empty) return null
+  const doc = snapshot.docs[0]
+  return { id: doc.id, ...doc.data() }
 }
 
 async function requireInvitedUser(user, res) {
@@ -156,14 +170,11 @@ async function requireInvitedUser(user, res) {
 }
 
 async function listLinks(user, res) {
-  const { data, error } = await supabase
-    .from('links')
-    .select('slug,url,created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  if (error) return res.status(500).json({ error: error.message })
-  return res.json(data || [])
+  const snapshot = await db.collection('links').where('userId', '==', user.uid).get()
+  const links = snapshot.docs
+    .map((doc) => ({ slug: doc.id, url: doc.data().url, created_at: toIso(doc.data().createdAt) }))
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  return res.json(links)
 }
 
 async function createLink(user, body, res) {
@@ -174,13 +185,8 @@ async function createLink(user, body, res) {
   if (!slug) return res.status(400).json({ error: 'Escribe un alias válido.' })
   if (slug.length > 60) return res.status(400).json({ error: 'El alias es demasiado largo.' })
 
-  const { count, error: countError } = await supabase
-    .from('links')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-
-  if (countError) return res.status(500).json({ error: countError.message })
-  if ((count || 0) >= MAX_LINKS_PER_USER) {
+  const countSnapshot = await db.collection('links').where('userId', '==', user.uid).count().get()
+  if (countSnapshot.data().count >= MAX_LINKS_PER_USER) {
     return res.status(403).json({
       error: `Llegaste al límite de ${MAX_LINKS_PER_USER} enlaces activos. Borra uno antiguo para crear otro.`,
     })
@@ -191,14 +197,15 @@ async function createLink(user, body, res) {
     return res.status(409).json({ error: 'Ese alias ya existe. Prueba con otro.' })
   }
 
-  const { error } = await supabase.from('links').insert({
-    user_id: user.id,
-    slug,
-    url,
-  })
-
-  if (error) {
-    const duplicate = error.code === '23505'
+  try {
+    // .create() en vez de .set() para que falle si el slug ya existe como documento (uniqueness atómica)
+    await db.collection('links').doc(slug).create({
+      userId: user.uid,
+      url,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+  } catch (error) {
+    const duplicate = error.code === 6 // gRPC ALREADY_EXISTS
     return res.status(duplicate ? 409 : 500).json({
       error: duplicate ? 'Ese alias ya existe. Prueba con otro.' : error.message,
     })
@@ -213,17 +220,13 @@ async function deleteLink(user, body, res) {
   const slug = normalizeSlug(body.slug)
   if (!slug) return res.status(400).json({ error: 'Alias no válido.' })
 
-  const { data, error } = await supabase
-    .from('links')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('slug', slug)
-    .select('slug')
-    .maybeSingle()
+  const ref = db.collection('links').doc(slug)
+  const doc = await ref.get()
+  if (!doc.exists || doc.data().userId !== user.uid) {
+    return res.status(404).json({ error: 'No encontré ese enlace en tu cuenta.' })
+  }
 
-  if (error) return res.status(500).json({ error: error.message })
-  if (!data) return res.status(404).json({ error: 'No encontré ese enlace en tu cuenta.' })
-
+  await ref.delete()
   await redis.del(`url:${slug}`)
   return res.json({ success: true })
 }
@@ -232,15 +235,12 @@ async function claimInvite(user, body, res) {
   const token = String(body.invite || '').trim()
   if (!token) return res.status(400).json({ error: 'Falta el código de invitación.' })
 
-  const { data: invite, error: findError } = await supabase
-    .from('invites')
-    .select('id,email,claimed_by')
-    .eq('token', token)
-    .maybeSingle()
+  const ref = db.collection('invites').doc(token)
+  const doc = await ref.get()
+  if (!doc.exists) return res.status(404).json({ error: 'La invitación no existe o ya fue eliminada.' })
 
-  if (findError) return res.status(500).json({ error: findError.message })
-  if (!invite) return res.status(404).json({ error: 'La invitación no existe o ya fue eliminada.' })
-  if (invite.claimed_by && invite.claimed_by !== user.id) {
+  const invite = doc.data()
+  if (invite.claimedBy && invite.claimedBy !== user.uid) {
     return res.status(409).json({ error: 'Esta invitación ya fue usada por otra cuenta.' })
   }
   if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
@@ -249,12 +249,7 @@ async function claimInvite(user, body, res) {
     })
   }
 
-  const { error } = await supabase
-    .from('invites')
-    .update({ claimed_by: user.id, claimed_at: new Date().toISOString() })
-    .eq('id', invite.id)
-
-  if (error) return res.status(500).json({ error: error.message })
+  await ref.update({ claimedBy: user.uid, claimedAt: admin.firestore.FieldValue.serverTimestamp() })
   return res.json({ success: true })
 }
 
@@ -264,11 +259,22 @@ async function createInvite(body, res) {
     return res.status(400).json({ error: 'Escribe un correo válido.' })
   }
 
-  const token = randomBytes(24).toString('hex')
-  const { error } = await supabase.from('invites').insert({ email, token })
+  const existing = await db.collection('invites').where('email', '==', email).limit(1).get()
+  if (!existing.empty) {
+    return res.status(409).json({ error: 'Ese correo ya tiene una invitación.' })
+  }
 
-  if (error) {
-    const duplicate = error.code === '23505'
+  const token = randomBytes(24).toString('hex')
+
+  try {
+    await db.collection('invites').doc(token).create({
+      email,
+      claimedBy: null,
+      claimedAt: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+  } catch (error) {
+    const duplicate = error.code === 6 // gRPC ALREADY_EXISTS
     return res.status(duplicate ? 409 : 500).json({
       error: duplicate ? 'Ese correo ya tiene una invitación.' : error.message,
     })
@@ -282,27 +288,28 @@ async function createInvite(body, res) {
 }
 
 async function listInvites(res) {
-  const { data, error } = await supabase
-    .from('invites')
-    .select('id,email,token,claimed_at,created_at')
-    .order('created_at', { ascending: false })
+  const snapshot = await db.collection('invites').get()
+  const invites = snapshot.docs
+    .map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        email: data.email,
+        claimed_at: toIso(data.claimedAt),
+        created_at: toIso(data.createdAt),
+        invite: `${SITE_URL}/Acortador?invite=${doc.id}`,
+      }
+    })
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 
-  if (error) return res.status(500).json({ error: error.message })
-
-  return res.json(
-    (data || []).map((invite) => ({
-      ...invite,
-      invite: `${SITE_URL}/Acortador?invite=${invite.token}`,
-    })),
-  )
+  return res.json(invites)
 }
 
 async function deleteInvite(body, res) {
   const id = String(body.id || '').trim()
   if (!id) return res.status(400).json({ error: 'Falta la invitación.' })
 
-  const { error } = await supabase.from('invites').delete().eq('id', id)
-  if (error) return res.status(500).json({ error: error.message })
+  await db.collection('invites').doc(id).delete()
   return res.json({ success: true })
 }
 
@@ -322,14 +329,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET' && action === 'config') {
     return res.json({
-      supabaseUrl,
-      supabaseAnonKey,
+      firebaseApiKey,
+      firebaseAuthDomain,
+      firebaseProjectId,
+      firebaseAppId,
       siteUrl: SITE_URL,
       maxLinksPerUser: MAX_LINKS_PER_USER,
     })
   }
 
-  if (!requireSupabase(res)) return
+  if (!requireFirebase(res)) return
 
   if (action === 'admin-invites') {
     if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
