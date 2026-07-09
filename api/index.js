@@ -279,9 +279,53 @@ async function createInvite(body, res) {
 
   return res.json({
     success: true,
+    id: token,
     invite: `${SITE_URL}/Acortador?invite=${token}`,
     email,
   })
+}
+
+async function sendInviteEmail(email, inviteUrl, res) {
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(500).json({ error: 'Falta configurar RESEND_API_KEY en Vercel.' })
+  }
+
+  const emailRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || 'juteach.org <onboarding@resend.dev>',
+      to: email,
+      subject: 'Tu invitación a juteach.org',
+      html: `
+        <p>¡Hola!</p>
+        <p>Te invitaron a crear tu cuenta en <strong>juteach.org</strong>, el acortador de enlaces y QR privado para docentes.</p>
+        <p><a href="${inviteUrl}">Haz clic aquí para crear tu cuenta</a></p>
+        <p style="color:#888;font-size:12px">Este enlace es personal e intransferible. Si no esperabas este correo, puedes ignorarlo.</p>
+      `,
+    }),
+  })
+
+  if (!emailRes.ok) {
+    const body = await emailRes.json().catch(() => ({}))
+    return res.status(502).json({ error: body.message || 'No se pudo enviar el correo.' })
+  }
+
+  return res.json({ success: true })
+}
+
+async function sendInvite(body, res) {
+  const id = String(body.id || '').trim()
+  if (!id) return res.status(400).json({ error: 'Falta la invitación.' })
+
+  const doc = await db.collection('invites').doc(id).get()
+  if (!doc.exists) return res.status(404).json({ error: 'La invitación no existe o ya fue eliminada.' })
+
+  const inviteUrl = `${SITE_URL}/Acortador?invite=${id}`
+  return sendInviteEmail(doc.data().email, inviteUrl, res)
 }
 
 async function listInvites(res) {
@@ -349,6 +393,12 @@ export default async function handler(req, res) {
     if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
     if (!await isAdmin(req, res)) return
     return createInvite(body, res)
+  }
+
+  if (req.method === 'POST' && body.action === 'admin-send-invite') {
+    if (!await checkRateLimit(req, res, 'admin', 10, 60)) return
+    if (!await isAdmin(req, res)) return
+    return sendInvite(body, res)
   }
 
   if (req.method === 'POST' && body.action === 'admin-delete-invite') {

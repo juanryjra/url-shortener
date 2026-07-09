@@ -68,7 +68,17 @@ Estos valores **no son secretos** (se exponen igual en cualquier app web de Fire
 
 Este archivo es secreto — no lo subas al repositorio ni lo compartas. Solo se usa en la variable de entorno de Vercel del siguiente paso.
 
-## 6. Variables que debes agregar en Vercel
+## 6. Crear cuenta en Resend (para enviar las invitaciones por correo)
+
+1. Entra a [resend.com](https://resend.com) y crea una cuenta gratis (con Google o correo).
+2. Ve a **API Keys** en el menú lateral → **Create API Key**. Ponle un nombre (ej. `juteach-invites`) y copia la key que empieza con `re_...` (solo se muestra una vez).
+3. Para poder enviar correos a **cualquier** dirección (no solo a la tuya), necesitas verificar tu dominio:
+   - Ve a **Domains → Add Domain** y escribe `juteach.org`.
+   - Resend te va a dar unos registros DNS (tipo `TXT` y `MX`) para agregar en el proveedor donde administras el dominio `juteach.org`.
+   - Una vez agregados y verificados (puede tardar unos minutos), puedes usar un remitente como `invitaciones@juteach.org`.
+4. Mientras no verifiques el dominio, Resend solo te deja enviar correos de prueba a la misma dirección con la que te registraste, usando el remitente `onboarding@resend.dev` (útil para probar antes de verificar el dominio).
+
+## 7. Variables que debes agregar en Vercel
 
 En Vercel, abre el proyecto y entra a **Settings → Environment Variables**.
 
@@ -80,9 +90,13 @@ FIREBASE_AUTH_DOMAIN=el_authDomain_del_paso_4
 FIREBASE_PROJECT_ID=el_projectId_del_paso_4
 FIREBASE_APP_ID=el_appId_del_paso_4
 FIREBASE_SERVICE_ACCOUNT_KEY=el_json_completo_del_paso_5_en_una_sola_linea
+RESEND_API_KEY=la_api_key_del_paso_6
+RESEND_FROM_EMAIL=juteach.org <invitaciones@juteach.org>
 PUBLIC_SITE_URL=https://juteach.org
 MAX_LINKS_PER_USER=100
 ```
+
+`RESEND_FROM_EMAIL` es opcional: si no la agregas, se usa `onboarding@resend.dev` (solo funciona para pruebas contigo mismo, hasta que verifiques tu dominio en Resend).
 
 Para `FIREBASE_SERVICE_ACCOUNT_KEY`, pega el JSON completo de la cuenta de servicio como una sola línea de texto (Vercel acepta valores largos sin problema).
 
@@ -96,17 +110,17 @@ ADMIN_EMAIL=...
 
 Elimina las variables antiguas de Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) si ya no las vas a usar. `APP_PASSWORD` ya no la usa el código — las acciones de administrador ahora se protegen solo verificando que hayas iniciado sesión con el correo de `ADMIN_EMAIL`, así que también puedes eliminarla.
 
-## 7. Cómo usarlo como admin
+## 8. Cómo usarlo como admin
 
 1. Entra a `https://juteach.org/Acortador`.
 2. Inicia sesión con una cuenta tuya (o créala) usando el correo que pusiste en `ADMIN_EMAIL`. Firebase te pedirá confirmar tu correo antes de dejarte entrar.
 3. Abre la pestaña **Admin** (solo aparece para ese correo).
 4. Escribe el correo de la persona autorizada.
 5. Toca **Crear invitación**.
-6. Copia el enlace y envíaselo a esa persona.
+6. Toca **Enviar por correo** para que le llegue el enlace automáticamente (o **Copiar enlace** si prefieres enviarlo tú por otro medio). También puedes reenviarlo después desde la lista de invitaciones.
 
-La persona abre el enlace, crea su cuenta con ese mismo correo, confirma su correo desde el mensaje que le llega, inicia sesión y ya puede crear sus propios enlaces y QR.
+La persona recibe el correo, abre el enlace, crea su cuenta con ese mismo correo, confirma su correo desde el mensaje que le llega, inicia sesión y ya puede crear sus propios enlaces y QR.
 
-## 8. Importante sobre enlaces actuales
+## 9. Importante sobre enlaces actuales
 
 Los enlaces que ya existen en Upstash seguirán redirigiendo (ese sistema no cambió). Pero como los datos de usuarios/invitaciones de Supabase no se migraron, todos los usuarios deben registrarse de nuevo en Firebase.

@@ -394,10 +394,13 @@
       <div class="invite-result" id="invite-result">
         <div style="font-size:12px;font-weight:700;color:#085041;margin-bottom:4px">✓ Invitación creada para <span id="inv-email-result"></span></div>
         <div class="invite-url" id="inv-url-result"></div>
-        <button class="btn btn-ghost" onclick="copyText($('inv-url-result').textContent)" style="width:100%">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          Copiar enlace de invitación
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" style="flex:1" onclick="copyText($('inv-url-result').textContent)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copiar enlace
+          </button>
+          <button class="btn btn-primary" style="flex:1" onclick="emailInvite(lastInviteId,this)">Enviar por correo</button>
+        </div>
       </div>
 
       <div class="admin-row">
@@ -438,6 +441,7 @@ let allLinks = [];
 let siteUrl = "https://juteach.org";
 let currentQRConfig = { color:"#1D9E75", bg:"#ffffff", style:"square", logo:"" };
 let isRecoveryMode = false;
+let lastInviteId = null;
 
 const qrCode = new QRCodeStyling({
   width:300, height:300, margin:10,
@@ -815,11 +819,22 @@ async function createInvite(){
   const data=await res.json();
   if(data.error) return showMessage("admin-msg",data.error);
   // Mostrar resultado con botón copiar
+  lastInviteId=data.id;
   $("inv-email-result").textContent=data.email;
   $("inv-url-result").textContent=data.invite;
   $("invite-result").style.display="block";
   $("invite-email").value="";
   loadInvites();
+}
+async function emailInvite(id,btn){
+  hideMessage("admin-msg");
+  const originalText=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="Enviando..."; }
+  const res=await fetch(API_URL,{method:"POST",headers:await authHeaders(),body:JSON.stringify({action:"admin-send-invite",id})});
+  const data=await res.json();
+  if(btn){ btn.disabled=false; btn.textContent=originalText; }
+  if(data.error) return showMessage("admin-msg",data.error);
+  showToast("✓ Correo enviado");
 }
 async function loadInvites(){
   const res=await fetch(`${API_URL}?action=admin-invites`,{headers:await authHeaders()});
@@ -833,6 +848,7 @@ async function loadInvites(){
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         ${!inv.claimed_at?`<button class="btn btn-ghost" onclick="copyText('${escapeHtml(inv.invite)}')">Copiar</button>`:""}
+        ${!inv.claimed_at?`<button class="btn btn-ghost" onclick="emailInvite('${escapeHtml(inv.id)}',this)">Enviar correo</button>`:""}
         <button class="btn btn-danger" onclick="deleteInvite('${escapeHtml(inv.id)}')">Eliminar</button>
       </div>
     </div>
